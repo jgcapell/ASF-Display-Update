@@ -252,7 +252,7 @@ const ITEM_CLASSES = [
 
 function buildItemClassFilter(since){
   const classFilter = ITEM_CLASSES.map(ic => `ItemClass eq '${ic.replace(/'/g,"''")}'`).join(' or ');
-  return `(${classFilter}) and InvoiceDate ge datetimeoffset'${since}'`;
+  return `(${classFilter}) and InvoiceDate ge datetime'${since}'`;
 }
 
 async function odataFetchAll(resource, filter, select, token){
