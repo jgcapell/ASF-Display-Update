@@ -348,6 +348,7 @@ function computeRecordsClient(customers, invoiceLines, openSoLines, manualSchedu
 
   const enrolledIds = new Set();
   const records = [];
+  const staleManualKeys = []; // manual notes superseded by a real SO or by shipping — safe to delete from KV
 
   function buildScheduled(cid, neededDisplays, fulfilled){
     // scheduled[displayName] = { source:'so', soNbr, orderDate } | { source:'manual', date, note }
@@ -364,6 +365,12 @@ function computeRecordsClient(customers, invoiceLines, openSoLines, manualSchedu
       if (!scheduled[display] || orderDate < scheduled[display].orderDate){
         scheduled[display] = { source: 'so', soNbr, orderDate };
       }
+    }
+    // Any manual note for a display that's now fulfilled or SO-scheduled is superseded — flag for cleanup
+    for (const d of neededDisplays){
+      const key = `${cid}::${d}`;
+      if (!manualSchedule[key]) continue;
+      if (fulfilled.has(d) || (scheduled[d] && scheduled[d].source === 'so')) staleManualKeys.push({ customerId: cid, display: d });
     }
     for (const d of neededDisplays){
       if (fulfilled.has(d) || scheduled[d]) continue; // SO takes priority over a manual note
@@ -478,7 +485,7 @@ function computeRecordsClient(customers, invoiceLines, openSoLines, manualSchedu
     });
   }
 
-  return records;
+  return { records, staleManualKeys };
 }
 
 function startLogin(){
@@ -539,6 +546,16 @@ async function deleteScheduleEntry(customerId, display){
   return res.json();
 }
 
+// Manual notes that a real Sales Order (or an actual shipment) has since overtaken are safe to
+// drop from KV — keeps the store tidy and avoids a stale date reappearing if that SO later falls through.
+async function cleanupStaleManualEntries(staleKeys){
+  if (!staleKeys || !staleKeys.length) return;
+  for (const { customerId, display } of staleKeys){
+    try { await deleteScheduleEntry(customerId, display); }
+    catch (e) { console.warn(`Could not clean up superseded manual entry for ${customerId} / ${display}:`, e); }
+  }
+}
+
 async function loadLiveData(){
   const token = sessionStorage.getItem('access_token');
   if (!token) return false;
@@ -555,7 +572,9 @@ async function loadLiveData(){
         .catch(e => { console.warn('Open SO fetch failed — Scheduled column will only show manual entries:', e); return []; }),
       fetchManualSchedule(token),
     ]);
-    RECORDS = computeRecordsClient(customers, invoiceLines, openSoLines, manualSchedule);
+    const computed = computeRecordsClient(customers, invoiceLines, openSoLines, manualSchedule);
+    RECORDS = computed.records;
+    cleanupStaleManualEntries(computed.staleManualKeys); // fire-and-forget; don't block the render on it
     document.getElementById('sinceLabel').textContent = since.slice(0,10);
     setLiveState('live', `Live — fetched ${new Date().toLocaleTimeString()}`);
     return true;
