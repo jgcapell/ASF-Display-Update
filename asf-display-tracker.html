@@ -36,6 +36,9 @@
   .top-meta code{ font-family:'IBM Plex Mono',monospace; font-size:12px; background:var(--green-soft); color:var(--green); padding:1px 5px; border-radius:4px; }
   #liveState{ display:inline-flex; align-items:center; gap:6px; font-size:11.5px; font-weight:600; padding:4px 10px; border-radius:99px; background:var(--slate-soft); color:var(--text-muted); margin-bottom:8px; }
   #liveState.live{ background:var(--green-soft); color:var(--green); }
+  #liveState.loading{ background:var(--teal-soft); color:var(--teal); }
+  #liveState.loading .dot{ animation: pulse-dot 1s ease-in-out infinite; }
+  @keyframes pulse-dot{ 0%,100%{ opacity:1; } 50%{ opacity:0.25; } }
   #liveState .dot{ width:6px;height:6px;border-radius:50%;background:currentColor; }
 
   .legend{ background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); padding:16px 20px; margin-bottom:20px; box-shadow:var(--shadow); }
@@ -47,6 +50,7 @@
   .transition .to{ font-weight:600; color:var(--ink); }
 
   .hero{ display:grid; grid-template-columns:minmax(280px,1fr) 340px; gap:32px; background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); padding:28px; margin-bottom:20px; box-shadow:var(--shadow); }
+  .hero.mosaic-only{ grid-template-columns:1fr; }
   .mosaic-head{ font-family:'Space Grotesk',sans-serif; font-size:14px; font-weight:600; color:var(--ink-soft); margin:0 0 14px; text-transform:uppercase; letter-spacing:0.06em; }
   #mosaic{ display:grid; grid-template-columns:repeat(24, 1fr); gap:4px; }
   .tile{ aspect-ratio:1; border-radius:2px; background:var(--line); cursor:pointer; transition:transform .1s ease; position:relative; }
@@ -57,14 +61,21 @@
   .tile.unlisted{ background:var(--plum); }
   .tile.up_to_date{ background:var(--slate); }
 
-  .kpis{ display:flex; flex-direction:column; gap:10px; justify-content:center; }
-  .kpi{ display:flex; align-items:baseline; gap:10px; }
-  .kpi .num{ font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:24px; line-height:1; color:var(--ink); min-width:44px; }
-  .kpi .lbl{ font-size:12.5px; color:var(--text-muted); }
-  .kpi-swatch{ display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:2px; vertical-align:middle; }
-  .coverage-bar{ height:8px; border-radius:99px; background:var(--line); overflow:hidden; display:flex; margin-top:8px; }
-  .coverage-bar > div{ height:100%; }
-  .coverage-lbl{ font-size:12.5px; color:var(--text-muted); margin-top:6px; }
+  .progress-panel{ background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); padding:24px 28px; margin-bottom:20px; box-shadow:var(--shadow); }
+  .progress-row{ display:grid; grid-template-columns:220px 1fr 260px; align-items:center; gap:16px; padding:9px 0; border-bottom:1px solid var(--line); }
+  .progress-row:last-child{ border-bottom:none; }
+  .progress-label{ font-size:13px; font-weight:600; color:var(--ink); }
+  .progress-track{ display:flex; height:12px; border-radius:99px; overflow:hidden; background:var(--line); }
+  .progress-seg{ height:100%; }
+  .progress-seg.shipped{ background:var(--green); }
+  .progress-seg.scheduled{ background:var(--teal); }
+  .progress-seg.not-started{ background:var(--amber-soft); }
+  .progress-count{ font-size:12px; color:var(--text-muted); white-space:nowrap; }
+  .progress-count strong{ color:var(--ink); font-weight:600; }
+  .progress-legend{ display:flex; gap:16px; margin-top:14px; font-size:11.5px; color:var(--text-muted); }
+  .progress-legend span{ display:inline-flex; align-items:center; gap:5px; }
+  .progress-legend .sw{ width:9px; height:9px; border-radius:2px; display:inline-block; }
+
 
   .controls{ display:flex; gap:12px; flex-wrap:wrap; align-items:center; margin-bottom:16px; background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); padding:14px 16px; }
   #search{ flex:1 1 220px; padding:9px 12px; border:1px solid var(--line); border-radius:8px; font-family:'Inter',sans-serif; font-size:14px; background:var(--paper); color:var(--text); }
@@ -100,6 +111,18 @@
   .chip.current{ background:var(--paper); border-color:var(--line); color:var(--text-muted); }
   .chip.need-open{ background:var(--amber-soft); color:var(--amber); font-weight:600; }
   .chip.need-done{ background:var(--green-soft); color:var(--green); font-weight:600; text-decoration:line-through; text-decoration-color:rgba(63,107,74,0.4); }
+  .chip.sched-so{ background:var(--teal-soft); color:var(--teal); font-weight:600; }
+  .chip.sched-manual{ background:var(--teal-soft); color:var(--teal); font-weight:600; }
+  .chip.sched-none{ background:var(--paper); border:1px dashed var(--line); color:var(--text-muted); cursor:pointer; }
+  .chip.sched-none:hover{ border-color:var(--ink-soft); color:var(--ink-soft); }
+  .chip-action{ cursor:pointer; margin-left:4px; opacity:0.7; }
+  .chip-action:hover{ opacity:1; }
+  .sched-editor{ display:inline-flex; align-items:center; gap:4px; background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:2px 4px; }
+  .sched-editor input[type="date"]{ font:inherit; font-size:11px; border:none; background:transparent; padding:2px; }
+  .sched-editor button{ border:none; background:transparent; cursor:pointer; font-size:13px; padding:2px 4px; border-radius:4px; }
+  .sched-editor .sched-save{ color:var(--green); }
+  .sched-editor .sched-cancel{ color:var(--text-muted); }
+  .sched-editor button:hover{ background:var(--paper); }
   .chevron{ display:inline-block; transition:transform .15s ease; color:var(--text-muted); margin-right:4px; }
   tr.row.expanded .chevron{ transform:rotate(90deg); }
   tr.detail-row td{ background:var(--paper); padding:0; }
@@ -163,12 +186,16 @@
     <div class="transitions" id="transitions"><!-- filled by JS --></div>
   </section>
 
-  <section class="hero">
+  <section class="hero mosaic-only">
     <div>
       <p class="mosaic-head">Every displaying dealer, one tile each</p>
       <div id="mosaic"></div>
     </div>
-    <div class="kpis" id="kpis"><!-- filled by JS --></div>
+  </section>
+
+  <section class="progress-panel">
+    <p class="mosaic-head">Display Collection Progress</p>
+    <div id="progressBars"><!-- filled by JS --></div>
   </section>
 
   <div class="controls">
@@ -176,6 +203,11 @@
     <div class="pillbar" id="statusPills"></div>
     <select id="repFilter"><option value="">All reps</option></select>
     <select id="neededFilter"><option value="">Needs any display</option></select>
+    <select id="scheduleFilter">
+      <option value="">Any scheduling</option>
+      <option value="scheduled">Scheduled</option>
+      <option value="not_scheduled">Not scheduled</option>
+    </select>
   </div>
 
   <p class="result-count" id="resultCount"></p>
@@ -188,6 +220,7 @@
         <th data-key="loc">Location</th>
         <th data-key="current">Current Displays</th>
         <th data-key="needed">Needed Updates</th>
+        <th data-key="scheduled">Scheduled</th>
         <th data-key="status">Status</th>
         <th data-key="lastUpdate">Last Qualifying Update</th>
       </tr>
@@ -202,7 +235,8 @@
     <em>Updated</em>: every required replacement display has shipped since 5/1/2026.
     <em>Up to Date</em>: every display this dealer currently has is already the current generation &mdash; nothing owed.
     <em>Unlisted</em>: invoiced for these item classes but AR-Customers shows no display program on file.</p>
-    <p>Click any row to expand the invoice line detail. Lines highlighted green count toward a required update; the rest are other samples/marketing collateral invoiced in the same window.</p>
+    <p><strong>Scheduled column</strong> &mdash; for each display still owed, shows an open Sales Order (SO# &amp; date) if one exists, or lets you click to note an expected date manually if no SO has been entered yet. Manual dates are shared &mdash; anyone opening this page sees the same notes, stored via the Worker. Click the pencil to edit a note or the &times; to remove it.</p>
+    <p>Click any row to expand the invoice and open-order line detail. Lines highlighted green count toward a required update; the rest are other samples/marketing collateral invoiced in the same window.</p>
     <p>Business rules (which display replaces which, and which SKU counts toward which display) live in <code>asf-display-tracker-mapping.json</code> &mdash; edit that file to change the logic without touching this page.</p>
   </footer>
 
@@ -220,7 +254,7 @@ const STATUS_META = {
 
 let RECORDS = [];
 let RULES = { attributes:{}, updateMap:{}, skuMap:{} };
-let state = { search:"", status:"", rep:"", needed:"", sortKey:"status", sortDir:"asc", expanded:new Set() };
+let state = { search:"", status:"", rep:"", needed:"", schedule:"", sortKey:"status", sortDir:"asc", expanded:new Set() };
 
 // ── Live-mode config ─────────────────────────────────────────────────────
 // Fill in WORKER_URL after `wrangler deploy` (see the Worker's deploy output).
@@ -255,6 +289,26 @@ function buildItemClassFilter(since){
   return `(${classFilter}) and InvoiceDate ge datetime'${since}'`;
 }
 
+// ── Open Sales Order lines (from the "GC-SOOpenLineDetail" Generic Inquiry) ──
+// Confirmed via CData against the live schema on 8/20/2026 — resource name and
+// field names below are verified, not guesses (unlike the first draft of this).
+const OPEN_SO_RESOURCE = "GC-SOOpenLineDetail";
+const OPEN_SO_FIELDS = {
+  customerId: "CustomerID",
+  orderNbr: "OrderNbr",
+  orderDate: "Date",
+  itemClass: "ClassID",
+  inventoryId: "InventoryID",
+  description: "Description",
+  openQty: "OpenQty",
+};
+const OPEN_SO_SELECT = Object.values(OPEN_SO_FIELDS).join(',');
+
+function buildOpenSoItemClassFilter(){
+  // Same fixed-width ClassID strings as ItemClass on InvoicedItems — confirmed identical format.
+  return ITEM_CLASSES.map(ic => `${OPEN_SO_FIELDS.itemClass} eq '${ic.replace(/'/g,"''")}'`).join(' or ');
+}
+
 async function odataFetchAll(resource, filter, select, token){
   const pageSize = 1000;
   let skip = 0;
@@ -280,8 +334,11 @@ async function odataFetchAll(resource, filter, select, token){
   return rows;
 }
 
-function computeRecordsClient(customers, invoiceLines){
+function computeRecordsClient(customers, invoiceLines, openSoLines, manualSchedule){
   const { attributes, updateMap, skuMap } = RULES;
+  openSoLines = openSoLines || [];
+  manualSchedule = manualSchedule || {};
+
   const linesByCustomer = new Map();
   for (const line of invoiceLines){
     const cid = (line.CustomerID || '').trim();
@@ -289,8 +346,40 @@ function computeRecordsClient(customers, invoiceLines){
     linesByCustomer.get(cid).push(line);
   }
 
+  const soByCustomer = new Map();
+  for (const line of openSoLines){
+    const cid = (line[OPEN_SO_FIELDS.customerId] || '').trim();
+    if (!soByCustomer.has(cid)) soByCustomer.set(cid, []);
+    soByCustomer.get(cid).push(line);
+  }
+
   const enrolledIds = new Set();
   const records = [];
+
+  function buildScheduled(cid, neededDisplays, fulfilled){
+    // scheduled[displayName] = { source:'so', soNbr, orderDate } | { source:'manual', date, note }
+    // Only meaningful for displays that are needed but not yet fulfilled.
+    const scheduled = {};
+    for (const soLine of (soByCustomer.get(cid) || [])){
+      const invId = (soLine[OPEN_SO_FIELDS.inventoryId] || '').trim();
+      const skuEntry = skuMap[invId];
+      const display = skuEntry ? skuEntry.display : null;
+      if (!display || !neededDisplays.has(display) || fulfilled.has(display)) continue;
+      const orderDate = (soLine[OPEN_SO_FIELDS.orderDate] || '').slice(0,10);
+      const soNbr = soLine[OPEN_SO_FIELDS.orderNbr];
+      // Keep the earliest order date if a display shows up on more than one open SO
+      if (!scheduled[display] || orderDate < scheduled[display].orderDate){
+        scheduled[display] = { source: 'so', soNbr, orderDate };
+      }
+    }
+    for (const d of neededDisplays){
+      if (fulfilled.has(d) || scheduled[d]) continue; // SO takes priority over a manual note
+      const key = `${cid}::${d}`;
+      const manual = manualSchedule[key];
+      if (manual) scheduled[d] = { source: 'manual', date: manual.date, note: manual.note || '' };
+    }
+    return scheduled;
+  }
 
   for (const cust of customers){
     const cid = (cust.CustomerID || '').trim();
@@ -326,11 +415,31 @@ function computeRecordsClient(customers, invoiceLines){
       };
     });
 
+    const scheduled = buildScheduled(cid, neededDisplays, fulfilled);
+
+    const rawSoLines = (soByCustomer.get(cid) || []).slice().sort((a,b)=> (a[OPEN_SO_FIELDS.orderDate]||'') < (b[OPEN_SO_FIELDS.orderDate]||'') ? -1 : 1);
+    const openOrders = rawSoLines.map(l=>{
+      const invId = (l[OPEN_SO_FIELDS.inventoryId] || '').trim();
+      const skuEntry = skuMap[invId];
+      return {
+        soNbr: l[OPEN_SO_FIELDS.orderNbr],
+        orderDate: (l[OPEN_SO_FIELDS.orderDate] || '').slice(0,10),
+        itemClass: (l[OPEN_SO_FIELDS.itemClass] || '').trim(),
+        inventoryId: invId,
+        description: l[OPEN_SO_FIELDS.description],
+        openQty: l[OPEN_SO_FIELDS.openQty],
+        display: skuEntry ? skuEntry.display : null,
+      };
+    });
+
     let status;
     if (neededDisplays.size === 0) status = 'up_to_date';
     else if (fulfilled.size === neededDisplays.size) status = 'updated';
     else if (fulfilled.size > 0) status = 'partial';
     else status = 'needs_update';
+
+    const hasSchedule = [...neededDisplays].some(d => !fulfilled.has(d) && scheduled[d]);
+    const scheduleStatus = neededDisplays.size === 0 ? 'na' : (hasSchedule ? 'scheduled' : 'not_scheduled');
 
     const qualifyingDates = lines.filter(l=>l.counts).map(l=>l.date);
     const lastUpdate = qualifyingDates.length ? qualifyingDates.sort().reverse()[0] : null;
@@ -341,9 +450,10 @@ function computeRecordsClient(customers, invoiceLines){
       rep: (cust.SalespersonID||'').trim() || (cust.SalesAgentID||'').trim(),
       city: cust.City || '', state: cust.State || '',
       currentDisplays, neededDisplays: [...neededDisplays].sort(), fulfilledDisplays: [...fulfilled].sort(),
+      scheduled, scheduleStatus,
       status, lastUpdate, daysSince,
       lineCount: lines.length, totalQty: lines.reduce((s,l)=>s+(l.qty||0),0),
-      lines
+      lines, openOrders
     });
   }
 
@@ -366,9 +476,10 @@ function computeRecordsClient(customers, invoiceLines){
       rep: (cust.SalespersonID||'').trim() || (cust.SalesAgentID||'').trim(),
       city: cust.City || '', state: cust.State || '',
       currentDisplays: [], neededDisplays: [], fulfilledDisplays: [],
+      scheduled: {}, scheduleStatus: 'na',
       status: 'unlisted', lastUpdate: lines.length ? lines[0].date : null, daysSince: null,
       lineCount: lines.length, totalQty: lines.reduce((s,l)=>s+(l.qty||0),0),
-      lines
+      lines, openOrders: []
     });
   }
 
@@ -398,19 +509,58 @@ async function exchangeCodeForToken(code){
   return resp.json();
 }
 
+let CURRENT_TOKEN = null; // kept for save/delete calls after initial load
+
+async function fetchManualSchedule(token){
+  try {
+    const res = await fetch(`${LIVE.workerUrl}/schedule`, { headers: { Authorization: `Bearer ${token}` } });
+    if (!res.ok) return {};
+    return await res.json();
+  } catch (e) {
+    console.warn('Could not load manual schedule entries:', e);
+    return {};
+  }
+}
+
+async function saveScheduleEntry(customerId, display, date, note){
+  const token = CURRENT_TOKEN;
+  const res = await fetch(`${LIVE.workerUrl}/schedule`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ customerId, display, date, note: note || '' }),
+  });
+  if (!res.ok) throw new Error('Save failed: ' + (await res.text()));
+  return res.json();
+}
+
+async function deleteScheduleEntry(customerId, display){
+  const token = CURRENT_TOKEN;
+  const res = await fetch(`${LIVE.workerUrl}/schedule`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ customerId, display }),
+  });
+  if (!res.ok) throw new Error('Delete failed: ' + (await res.text()));
+  return res.json();
+}
+
 async function loadLiveData(){
   const token = sessionStorage.getItem('access_token');
   if (!token) return false;
+  CURRENT_TOKEN = token;
   setLiveState('loading', 'Loading live data…');
   try {
     const since = DEFAULT_SINCE;
-    const [customers, invoiceLines] = await Promise.all([
+    const [customers, invoiceLines, openSoLines, manualSchedule] = await Promise.all([
       odataFetchAll('AR-Customers', "CustomerStatus eq 'Active'",
         'CustomerID,CustomerName,CustomerStatus,SalespersonID,SalesAgentID,DisplayingDealers,City,State', token),
       odataFetchAll('InvoicedItems', buildItemClassFilter(since),
         'CustomerID,InvoiceDate,ItemClass,InventoryID,Description,Quantity', token),
+      odataFetchAll(OPEN_SO_RESOURCE, buildOpenSoItemClassFilter(), OPEN_SO_SELECT, token)
+        .catch(e => { console.warn('Open SO fetch failed — Scheduled column will only show manual entries:', e); return []; }),
+      fetchManualSchedule(token),
     ]);
-    RECORDS = computeRecordsClient(customers, invoiceLines);
+    RECORDS = computeRecordsClient(customers, invoiceLines, openSoLines, manualSchedule);
     document.getElementById('sinceLabel').textContent = since.slice(0,10);
     setLiveState('live', `Live — fetched ${new Date().toLocaleTimeString()}`);
     return true;
@@ -423,16 +573,27 @@ async function loadLiveData(){
 
 function setLiveState(kind, label){
   const el = document.getElementById('liveState');
-  el.className = kind === 'live' ? 'live' : '';
+  el.className = kind || '';
   document.getElementById('liveStateLabel').textContent = label;
 }
+
+const DEFAULT_SIGNIN_MESSAGE = "This dashboard reads live from Acumatica. Sign in with your Acumatica account to load current data.";
 
 function showSignInGate(message){
   document.getElementById('signInGate').style.display = 'grid';
   document.getElementById('mainContent').style.display = 'none';
-  if (message) document.getElementById('signInMessage').textContent = message;
+  document.getElementById('signInMessage').textContent = message || DEFAULT_SIGNIN_MESSAGE;
+  document.getElementById('signInBtn').style.display = 'inline-block';
   document.getElementById('liveBtn').textContent = 'Sign in with Acumatica';
   setLiveState('', 'Not signed in');
+}
+
+function showLoadingGate(){
+  document.getElementById('signInGate').style.display = 'grid';
+  document.getElementById('mainContent').style.display = 'none';
+  document.getElementById('signInMessage').textContent = 'Signed in — loading live data from Acumatica…';
+  document.getElementById('signInBtn').style.display = 'none';
+  setLiveState('loading', 'Loading live data…');
 }
 
 function showMainContent(){
@@ -481,6 +642,7 @@ async function boot(){
     return;
   }
 
+  showLoadingGate();
   const gotLive = await loadLiveData();
   if (gotLive) {
     document.getElementById('liveBtn').textContent = 'Sign out';
@@ -497,7 +659,7 @@ function finishRender(){
   renderTransitionLegend();
   buildFilters();
   renderMosaic();
-  renderKPIs();
+  renderProgressBars();
   render();
 }
 
@@ -536,6 +698,9 @@ function buildFilters(){
   neededDisplays.forEach(d=>{ const o=document.createElement('option'); o.value=d; o.textContent=d; needSel.appendChild(o); });
   needSel.addEventListener('change', ()=>{ state.needed = needSel.value; render(); });
 
+  const scheduleSel = document.getElementById('scheduleFilter');
+  scheduleSel.addEventListener('change', ()=>{ state.schedule = scheduleSel.value; render(); });
+
   document.getElementById('search').addEventListener('input', (e)=>{ state.search = e.target.value.trim().toLowerCase(); render(); });
 
   document.querySelectorAll('thead th[data-key]').forEach(th=>{
@@ -564,23 +729,36 @@ function renderMosaic(){
   });
 }
 
-function renderKPIs(){
-  const counts = {};
-  ['needs_update','partial','updated','up_to_date','unlisted'].forEach(k=> counts[k] = RECORDS.filter(r=>r.status===k).length);
+function renderProgressBars(){
+  const targets = [...new Set(Object.values(RULES.updateMap || {}).flat())];
+  const rows = targets.map(display=>{
+    let denom = 0, shipped = 0, scheduled = 0;
+    RECORDS.forEach(r=>{
+      if (!r.neededDisplays.includes(display)) return;
+      denom++;
+      if (r.fulfilledDisplays.includes(display)) shipped++;
+      else if (r.scheduled && r.scheduled[display]) scheduled++;
+    });
+    const notStarted = denom - shipped - scheduled;
+    const pct = n => denom ? (n/denom*100) : 0;
+    return { display, denom, shipped, scheduled, notStarted, shippedPct: pct(shipped), scheduledPct: pct(scheduled), notStartedPct: pct(notStarted) };
+  });
 
-  let neededSlots = 0, fulfilledSlots = 0;
-  RECORDS.forEach(r=>{ neededSlots += r.neededDisplays.length; fulfilledSlots += r.fulfilledDisplays.length; });
-  const pct = neededSlots ? Math.round((fulfilledSlots/neededSlots)*100) : 100;
-
-  document.getElementById('kpis').innerHTML = `
-    <div class="kpi"><div class="num" style="color:var(--amber)">${counts.needs_update}</div><div class="lbl"><span class="kpi-swatch" style="background:var(--amber)"></span>Needs Update</div></div>
-    <div class="kpi"><div class="num" style="color:var(--teal)">${counts.partial}</div><div class="lbl"><span class="kpi-swatch" style="background:var(--teal)"></span>Partial</div></div>
-    <div class="kpi"><div class="num" style="color:var(--green)">${counts.updated}</div><div class="lbl"><span class="kpi-swatch" style="background:var(--green)"></span>Fully Updated</div></div>
-    <div class="kpi"><div class="num" style="color:var(--slate)">${counts.up_to_date}</div><div class="lbl"><span class="kpi-swatch" style="background:var(--slate)"></span>Up to Date (nothing owed)</div></div>
-    <div class="kpi"><div class="num" style="color:var(--plum)">${counts.unlisted}</div><div class="lbl"><span class="kpi-swatch" style="background:var(--plum)"></span>Unlisted / data check</div></div>
-    <div>
-      <div class="coverage-bar"><div style="width:${pct}%; background:var(--green)"></div><div style="width:${100-pct}%; background:var(--amber)"></div></div>
-      <div class="coverage-lbl">${pct}% of required display updates fulfilled (${fulfilledSlots} of ${neededSlots} needed displays shipped)</div>
+  document.getElementById('progressBars').innerHTML = rows.map(row=>`
+    <div class="progress-row">
+      <div class="progress-label">${row.display}</div>
+      <div class="progress-track" title="${row.shipped} shipped, ${row.scheduled} scheduled, ${row.notStarted} not started">
+        <div class="progress-seg shipped" style="width:${row.shippedPct}%"></div>
+        <div class="progress-seg scheduled" style="width:${row.scheduledPct}%"></div>
+        <div class="progress-seg not-started" style="width:${row.notStartedPct}%"></div>
+      </div>
+      <div class="progress-count"><strong>${row.shipped + row.scheduled}/${row.denom}</strong> in progress or shipped &middot; ${row.notStarted} not started</div>
+    </div>
+  `).join('') + `
+    <div class="progress-legend">
+      <span><span class="sw" style="background:var(--green)"></span>Shipped</span>
+      <span><span class="sw" style="background:var(--teal)"></span>Scheduled (SO or manual note)</span>
+      <span><span class="sw" style="background:var(--amber-soft)"></span>Not started</span>
     </div>
   `;
 }
@@ -590,6 +768,7 @@ function applyFilters(){
     if (state.status && r.status !== state.status) return false;
     if (state.rep && r.rep !== state.rep) return false;
     if (state.needed && !r.neededDisplays.includes(state.needed)) return false;
+    if (state.schedule && r.scheduleStatus !== state.schedule) return false;
     if (state.search){
       const hay = (r.name+' '+r.id).toLowerCase();
       if (!hay.includes(state.search)) return false;
@@ -600,6 +779,7 @@ function applyFilters(){
 
 function sortRecords(list){
   const dir = state.sortDir === 'asc' ? 1 : -1;
+  const scheduleOrder = { not_scheduled: 0, scheduled: 1, na: 2 };
   return [...list].sort((a,b)=>{
     let av, bv;
     switch(state.sortKey){
@@ -608,6 +788,7 @@ function sortRecords(list){
       case 'loc': av=a.state+a.city; bv=b.state+b.city; break;
       case 'current': av=a.currentDisplays.length; bv=b.currentDisplays.length; break;
       case 'needed': av=a.neededDisplays.length; bv=b.neededDisplays.length; break;
+      case 'scheduled': av=scheduleOrder[a.scheduleStatus]; bv=scheduleOrder[b.scheduleStatus]; break;
       case 'status': av=STATUS_META[a.status].order; bv=STATUS_META[b.status].order; break;
       case 'lastUpdate': av=a.lastUpdate||''; bv=b.lastUpdate||''; break;
       default: av=a.name; bv=b.name;
@@ -623,6 +804,8 @@ function render(){
     th.classList.toggle('sorted', th.dataset.key===state.sortKey);
     th.classList.toggle('asc', th.dataset.key===state.sortKey && state.sortDir==='asc');
   });
+
+  renderProgressBars(); // cheap over ~400 records; keeps bars in sync after a manual schedule edit
 
   const filtered = sortRecords(applyFilters());
   document.getElementById('resultCount').textContent = `${filtered.length} customer${filtered.length===1?'':'s'} shown`;
@@ -640,9 +823,82 @@ function render(){
       detailRow.classList.toggle('hidden', isOpen);
     });
   });
+
+  tbody.querySelectorAll('[data-action]').forEach(el=>{
+    el.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      const { cid, display, action } = el.dataset;
+      if (action === 'clear') handleClearSchedule(cid, display, el);
+      else openScheduleEditor(el, cid, display);
+    });
+  });
+}
+
+function findRecord(cid){ return RECORDS.find(r=>r.id===cid); }
+
+function recomputeScheduleStatus(r){
+  const hasSchedule = r.neededDisplays.some(d => !r.fulfilledDisplays.includes(d) && r.scheduled[d]);
+  r.scheduleStatus = r.neededDisplays.length === 0 ? 'na' : (hasSchedule ? 'scheduled' : 'not_scheduled');
+}
+
+function openScheduleEditor(el, cid, display){
+  const record = findRecord(cid);
+  const existing = record && record.scheduled[display];
+  const existingDate = (existing && existing.source === 'manual') ? existing.date : '';
+  el.outerHTML = `
+    <span class="sched-editor" data-cid="${cid}" data-display="${display}">
+      <input type="date" class="sched-date-input" value="${existingDate}">
+      <button class="sched-save" title="Save">&#10003;</button>
+      <button class="sched-cancel" title="Cancel">&times;</button>
+    </span>`;
+  const editor = document.querySelector(`.sched-editor[data-cid="${cssEscape(cid)}"][data-display="${cssEscape(display)}"]`) ||
+                 [...document.querySelectorAll('.sched-editor')].find(e=>e.dataset.cid===cid && e.dataset.display===display);
+  if (!editor) return;
+  editor.querySelector('.sched-save').addEventListener('click', async (e)=>{
+    e.stopPropagation();
+    const date = editor.querySelector('.sched-date-input').value;
+    if (!date) return;
+    try {
+      await saveScheduleEntry(cid, display, date, '');
+      const rec = findRecord(cid);
+      rec.scheduled[display] = { source: 'manual', date, note: '' };
+      recomputeScheduleStatus(rec);
+      render();
+    } catch (err) { alert('Could not save: ' + err.message); }
+  });
+  editor.querySelector('.sched-cancel').addEventListener('click', (e)=>{ e.stopPropagation(); render(); });
+}
+
+async function handleClearSchedule(cid, display, el){
+  if (!confirm(`Remove the manually-noted date for ${display}?`)) return;
+  try {
+    await deleteScheduleEntry(cid, display);
+    const rec = findRecord(cid);
+    delete rec.scheduled[display];
+    recomputeScheduleStatus(rec);
+    render();
+  } catch (err) { alert('Could not remove: ' + err.message); }
 }
 
 function cssEscape(s){ return s.replace(/[^a-zA-Z0-9_-]/g,'_'); }
+
+function renderScheduledCell(r){
+  const openNeeded = r.neededDisplays.filter(d => !r.fulfilledDisplays.includes(d));
+  if (!openNeeded.length) return '<span class="chip current">n/a</span>';
+  return openNeeded.map(d=>{
+    const sch = r.scheduled[d];
+    if (sch && sch.source === 'so'){
+      return `<span class="chip sched-so" title="${d}">${d}: SO${sch.soNbr} &middot; ${sch.orderDate}</span>`;
+    }
+    if (sch && sch.source === 'manual'){
+      return `<span class="chip sched-manual" title="${d}">${d}: noted ${sch.date}
+        <span class="chip-action" data-cid="${r.id}" data-display="${d}" data-action="edit" title="Edit date">&#9998;</span>
+        <span class="chip-action" data-cid="${r.id}" data-display="${d}" data-action="clear" title="Remove">&times;</span>
+      </span>`;
+    }
+    return `<span class="chip sched-none" data-cid="${r.id}" data-display="${d}" data-action="add" title="Click to add an expected date">${d}: + add date</span>`;
+  }).join('');
+}
 
 function rowHtml(r){
   const meta = STATUS_META[r.status];
@@ -650,6 +906,7 @@ function rowHtml(r){
   const neededChips = r.neededDisplays.length
     ? r.neededDisplays.map(d=>`<span class="chip ${r.fulfilledDisplays.includes(d)?'need-done':'need-open'}">${d}</span>`).join('')
     : '<span class="chip current">nothing owed</span>';
+  const scheduledChips = renderScheduledCell(r);
   const isExpanded = state.expanded.has(r.id);
   return `
     <tr class="row ${isExpanded?'expanded':''}" data-id="${r.id}">
@@ -658,11 +915,12 @@ function rowHtml(r){
       <td>${r.city}${r.city&&r.state?', ':''}${r.state}</td>
       <td class="chip-cell">${currentChips}</td>
       <td class="chip-cell">${neededChips}</td>
+      <td class="chip-cell">${scheduledChips}</td>
       <td><span class="badge ${r.status}"><span class="dot"></span>${meta.label}</span></td>
       <td>${r.lastUpdate ? r.lastUpdate : '&mdash;'}${r.daysSince!=null ? ` <span class="cust-id">(${r.daysSince}d ago)</span>`:''}</td>
     </tr>
     <tr class="detail-row ${isExpanded?'':'hidden'}" data-id="${r.id}">
-      <td colspan="7">${detailHtml(r)}</td>
+      <td colspan="8">${detailHtml(r)}</td>
     </tr>
   `;
 }
@@ -675,8 +933,30 @@ function detailHtml(r){
       return `<span class="chip ${done?'need-done':'need-open'}">${done?'&#10003; ':''}${d}</span>`;
     }).join('') + `</div>`;
   }
-  if (!r.lines.length){
-    return `<div class="detail-wrap">${summary}<div class="empty-note">No invoice lines in these item classes since 5/1/2026.</div></div>`;
+
+  let soSection = '';
+  if (r.openOrders && r.openOrders.length){
+    const soRows = r.openOrders.map(l=>`
+      <tr>
+        <td>SO${l.soNbr}</td>
+        <td>${l.orderDate}</td>
+        <td>${l.itemClass}</td>
+        <td class="sku">${(l.inventoryId||'').trim()}</td>
+        <td>${l.description}</td>
+        <td>${l.openQty}</td>
+        <td><span class="disp-tag ${l.display?'':'none'}">${l.display || 'unmapped / general'}</span></td>
+      </tr>
+    `).join('');
+    soSection = `
+      <h4>${r.openOrders.length} open sales order line${r.openOrders.length===1?'':'s'} in these item classes</h4>
+      <table class="detail-table" style="margin-bottom:18px">
+        <thead><tr><th>SO#</th><th>Order Date</th><th>Item Class</th><th>SKU</th><th>Description</th><th>Open Qty</th><th>Counts Toward</th></tr></thead>
+        <tbody>${soRows}</tbody>
+      </table>`;
+  }
+
+  if (!r.lines.length && !(r.openOrders && r.openOrders.length)){
+    return `<div class="detail-wrap">${summary}<div class="empty-note">No invoice or open sales order lines in these item classes.</div></div>`;
   }
   const rows = r.lines.map(l=>`
     <tr class="${l.counts?'counts':''}">
@@ -692,7 +972,8 @@ function detailHtml(r){
     <div class="detail-wrap">
       <h4>Required updates</h4>
       ${summary || '<p style="font-size:13px;color:var(--text-muted);margin:0 0 14px">Nothing owed &mdash; every display on file is current.</p>'}
-      <h4>${r.lines.length} line item${r.lines.length===1?'':'s'} invoiced &middot; ${r.totalQty} units total</h4>
+      ${soSection}
+      <h4>${r.lines.length} invoiced line item${r.lines.length===1?'':'s'} &middot; ${r.totalQty} units total</h4>
       <table class="detail-table">
         <thead><tr><th>Date</th><th>Item Class</th><th>SKU</th><th>Description</th><th>Qty</th><th>Counts Toward</th></tr></thead>
         <tbody>${rows}</tbody>
