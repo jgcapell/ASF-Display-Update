@@ -61,7 +61,9 @@
       "Lifewood Beachfront Select"
     ],
     "LW Seq 2.0": [],
-    "LW Sequoia": [],
+    "LW Sequoia": [
+      "Lifewood Sequoia 2.0 Display"
+    ],
     "LW TRACE": [
       "Lifewood Trace"
     ],
@@ -81,7 +83,10 @@
     "EW VANTAGE": [],
     "EW RESERVE": [],
     "GCHD WPC": [],
-    "TRQ SPC": []
+    "TRQ SPC": [],
+    "Lifewood Sequoia 1.0 Display": [
+      "Lifewood Sequoia 2.0 Display"
+    ]
   },
   "skuMap": {
     "ARSAMP-052L": {
@@ -1043,6 +1048,16 @@
       "description": "Lifewood Trail Display Boards Set C - 2208, 2209",
       "itemClass": "USMILLS         -SAMPLES/ADVERT",
       "display": "Lifewood Trail"
+    },
+    "SEQUOIA2.0-DISPLAY*NEW*": {
+      "description": "Lifewood Sequoia 2.0 Display (new) - UNVERIFIED, no Acumatica history yet",
+      "itemClass": null,
+      "display": "Lifewood Sequoia 2.0 Display"
+    },
+    "SEQUOIASTACKER-UPDATE": {
+      "description": "Lifewood Sequoia 2.0 Display Stacker Update - UNVERIFIED, no Acumatica history yet",
+      "itemClass": null,
+      "display": "Lifewood Sequoia 2.0 Display"
     }
   },
   "requiredSkus": {
