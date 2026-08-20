@@ -281,6 +281,7 @@ const OPEN_SO_FIELDS = {
   customerId: "CustomerID",
   orderNbr: "OrderNbr",
   orderDate: "Date",
+  schedShipment: "SchedShipment", // added 8/20/2026 — verified via CData against live data
   itemClass: "ClassID",
   inventoryId: "InventoryID",
   description: "Description",
@@ -351,7 +352,7 @@ function computeRecordsClient(customers, invoiceLines, openSoLines, manualSchedu
   const staleManualKeys = []; // manual notes superseded by a real SO or by shipping — safe to delete from KV
 
   function buildScheduled(cid, neededDisplays, fulfilled){
-    // scheduled[displayName] = { source:'so', soNbr, orderDate } | { source:'manual', date, note }
+    // scheduled[displayName] = { source:'so', soNbr, shipDate } | { source:'manual', date, note }
     // Only meaningful for displays that are needed but not yet fulfilled.
     const scheduled = {};
     for (const soLine of (soByCustomer.get(cid) || [])){
@@ -359,11 +360,11 @@ function computeRecordsClient(customers, invoiceLines, openSoLines, manualSchedu
       const skuEntry = skuMap[invId];
       const display = skuEntry ? skuEntry.display : null;
       if (!display || !neededDisplays.has(display) || fulfilled.has(display) || !countsTowardDisplay(display, invId)) continue;
-      const orderDate = (soLine[OPEN_SO_FIELDS.orderDate] || '').slice(0,10);
+      const shipDate = (soLine[OPEN_SO_FIELDS.schedShipment] || '').slice(0,10);
       const soNbr = soLine[OPEN_SO_FIELDS.orderNbr];
-      // Keep the earliest order date if a display shows up on more than one open SO
-      if (!scheduled[display] || orderDate < scheduled[display].orderDate){
-        scheduled[display] = { source: 'so', soNbr, orderDate };
+      // Keep the earliest scheduled shipment if a display shows up on more than one open SO
+      if (!scheduled[display] || shipDate < scheduled[display].shipDate){
+        scheduled[display] = { source: 'so', soNbr, shipDate };
       }
     }
     // Any manual note for a display that's now fulfilled or SO-scheduled is superseded — flag for cleanup
@@ -417,14 +418,14 @@ function computeRecordsClient(customers, invoiceLines, openSoLines, manualSchedu
 
     const scheduled = buildScheduled(cid, neededDisplays, fulfilled);
 
-    const rawSoLines = (soByCustomer.get(cid) || []).slice().sort((a,b)=> (a[OPEN_SO_FIELDS.orderDate]||'') < (b[OPEN_SO_FIELDS.orderDate]||'') ? -1 : 1);
+    const rawSoLines = (soByCustomer.get(cid) || []).slice().sort((a,b)=> (a[OPEN_SO_FIELDS.schedShipment]||'') < (b[OPEN_SO_FIELDS.schedShipment]||'') ? -1 : 1);
     const openOrders = rawSoLines.map(l=>{
       const invId = (l[OPEN_SO_FIELDS.inventoryId] || '').trim();
       const skuEntry = skuMap[invId];
       const display = skuEntry ? skuEntry.display : null;
       return {
         soNbr: l[OPEN_SO_FIELDS.orderNbr],
-        orderDate: (l[OPEN_SO_FIELDS.orderDate] || '').slice(0,10),
+        shipDate: (l[OPEN_SO_FIELDS.schedShipment] || '').slice(0,10),
         itemClass: (l[OPEN_SO_FIELDS.itemClass] || '').trim(),
         inventoryId: invId,
         description: l[OPEN_SO_FIELDS.description],
@@ -885,7 +886,7 @@ function renderScheduledCell(r){
   return openNeeded.map(d=>{
     const sch = r.scheduled[d];
     if (sch && sch.source === 'so'){
-      return `<span class="chip sched-so" title="${d}">${d}: ${sch.soNbr} &middot; ${sch.orderDate}</span>`;
+      return `<span class="chip sched-so" title="${d}">${d}: ${sch.soNbr} &middot; ${sch.shipDate}</span>`;
     }
     if (sch && sch.source === 'manual'){
       return `<span class="chip sched-manual" title="${d}">${d}: noted ${sch.date}
@@ -936,7 +937,7 @@ function detailHtml(r){
     const soRows = r.openOrders.map(l=>`
       <tr class="${l.counts?'counts':''}">
         <td>${l.soNbr}</td>
-        <td>${l.orderDate}</td>
+        <td>${l.shipDate}</td>
         <td>${l.itemClass}</td>
         <td class="sku">${(l.inventoryId||'').trim()}</td>
         <td>${l.description}</td>
@@ -947,7 +948,7 @@ function detailHtml(r){
     soSection = `
       <h4>${r.openOrders.length} open sales order line${r.openOrders.length===1?'':'s'} in these item classes</h4>
       <table class="detail-table" style="margin-bottom:18px">
-        <thead><tr><th>SO#</th><th>Order Date</th><th>Item Class</th><th>SKU</th><th>Description</th><th>Open Qty</th><th>Counts Toward</th></tr></thead>
+        <thead><tr><th>SO#</th><th>Sched. Shipment</th><th>Item Class</th><th>SKU</th><th>Description</th><th>Open Qty</th><th>Counts Toward</th></tr></thead>
         <tbody>${soRows}</tbody>
       </table>`;
   }
