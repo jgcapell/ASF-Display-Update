@@ -50,16 +50,7 @@
   .transition .to{ font-weight:600; color:var(--ink); }
 
   .hero{ display:grid; grid-template-columns:minmax(280px,1fr) 340px; gap:32px; background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); padding:28px; margin-bottom:20px; box-shadow:var(--shadow); }
-  .hero.mosaic-only{ grid-template-columns:1fr; }
   .mosaic-head{ font-family:'Space Grotesk',sans-serif; font-size:14px; font-weight:600; color:var(--ink-soft); margin:0 0 14px; text-transform:uppercase; letter-spacing:0.06em; }
-  #mosaic{ display:grid; grid-template-columns:repeat(24, 1fr); gap:4px; }
-  .tile{ aspect-ratio:1; border-radius:2px; background:var(--line); cursor:pointer; transition:transform .1s ease; position:relative; }
-  .tile:hover{ transform:scale(1.35); z-index:5; box-shadow:0 2px 8px rgba(0,0,0,0.25); }
-  .tile.updated{ background:var(--green); }
-  .tile.partial{ background:var(--teal); }
-  .tile.needs_update{ background:var(--amber); }
-  .tile.unlisted{ background:var(--plum); }
-  .tile.up_to_date{ background:var(--slate); }
 
   .progress-panel{ background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); padding:24px 28px; margin-bottom:20px; box-shadow:var(--shadow); }
   .progress-row{ display:grid; grid-template-columns:220px 1fr 260px; align-items:center; gap:16px; padding:9px 0; border-bottom:1px solid var(--line); }
@@ -184,13 +175,6 @@
   <section class="legend">
     <p class="legend-head">Required display transitions</p>
     <div class="transitions" id="transitions"><!-- filled by JS --></div>
-  </section>
-
-  <section class="hero mosaic-only">
-    <div>
-      <p class="mosaic-head">Every displaying dealer, one tile each</p>
-      <div id="mosaic"></div>
-    </div>
   </section>
 
   <section class="progress-panel">
@@ -335,9 +319,18 @@ async function odataFetchAll(resource, filter, select, token){
 }
 
 function computeRecordsClient(customers, invoiceLines, openSoLines, manualSchedule){
-  const { attributes, updateMap, skuMap } = RULES;
+  const { attributes, updateMap, skuMap, requiredSkus } = RULES;
   openSoLines = openSoLines || [];
   manualSchedule = manualSchedule || {};
+
+  // For most displays, ANY SKU mapped to that display (via skuMap) counts toward fulfilling it.
+  // requiredSkus lets specific displays override that — only the listed SKU(s) count, even though
+  // other SKUs are still mapped to the same display name for informational/detail purposes.
+  function countsTowardDisplay(display, invId){
+    if (!display) return false;
+    const whitelist = requiredSkus && requiredSkus[display];
+    return whitelist ? whitelist.includes(invId) : true;
+  }
 
   const linesByCustomer = new Map();
   for (const line of invoiceLines){
@@ -364,7 +357,7 @@ function computeRecordsClient(customers, invoiceLines, openSoLines, manualSchedu
       const invId = (soLine[OPEN_SO_FIELDS.inventoryId] || '').trim();
       const skuEntry = skuMap[invId];
       const display = skuEntry ? skuEntry.display : null;
-      if (!display || !neededDisplays.has(display) || fulfilled.has(display)) continue;
+      if (!display || !neededDisplays.has(display) || fulfilled.has(display) || !countsTowardDisplay(display, invId)) continue;
       const orderDate = (soLine[OPEN_SO_FIELDS.orderDate] || '').slice(0,10);
       const soNbr = soLine[OPEN_SO_FIELDS.orderNbr];
       // Keep the earliest order date if a display shows up on more than one open SO
@@ -402,7 +395,7 @@ function computeRecordsClient(customers, invoiceLines, openSoLines, manualSchedu
       const invId = (l.InventoryID || '').trim();
       const skuEntry = skuMap[invId];
       const display = skuEntry ? skuEntry.display : null;
-      const counts = !!(display && neededDisplays.has(display));
+      const counts = !!display && neededDisplays.has(display) && countsTowardDisplay(display, invId);
       if (counts) fulfilled.add(display);
       return {
         date: (l.InvoiceDate || '').slice(0,10),
@@ -421,6 +414,7 @@ function computeRecordsClient(customers, invoiceLines, openSoLines, manualSchedu
     const openOrders = rawSoLines.map(l=>{
       const invId = (l[OPEN_SO_FIELDS.inventoryId] || '').trim();
       const skuEntry = skuMap[invId];
+      const display = skuEntry ? skuEntry.display : null;
       return {
         soNbr: l[OPEN_SO_FIELDS.orderNbr],
         orderDate: (l[OPEN_SO_FIELDS.orderDate] || '').slice(0,10),
@@ -428,7 +422,8 @@ function computeRecordsClient(customers, invoiceLines, openSoLines, manualSchedu
         inventoryId: invId,
         description: l[OPEN_SO_FIELDS.description],
         openQty: l[OPEN_SO_FIELDS.openQty],
-        display: skuEntry ? skuEntry.display : null,
+        display,
+        counts: !!display && neededDisplays.has(display) && countsTowardDisplay(display, invId),
       };
     });
 
@@ -658,7 +653,6 @@ async function boot(){
 function finishRender(){
   renderTransitionLegend();
   buildFilters();
-  renderMosaic();
   renderProgressBars();
   render();
 }
@@ -709,22 +703,6 @@ function buildFilters(){
       if (state.sortKey === key) { state.sortDir = state.sortDir === 'asc' ? 'desc' : 'asc'; }
       else { state.sortKey = key; state.sortDir = 'asc'; }
       render();
-    });
-  });
-}
-
-function renderMosaic(){
-  const mosaic = document.getElementById('mosaic');
-  const sorted = [...RECORDS].sort((a,b)=> STATUS_META[a.status].order-STATUS_META[b.status].order || a.name.localeCompare(b.name));
-  mosaic.innerHTML = sorted.map(r=>
-    `<div class="tile ${r.status}" title="${r.name} — ${STATUS_META[r.status].label}" data-id="${r.id}"></div>`
-  ).join('');
-  mosaic.querySelectorAll('.tile').forEach(t=>{
-    t.addEventListener('click', ()=>{
-      document.getElementById('search').value = t.dataset.id;
-      state.search = t.dataset.id.toLowerCase();
-      render();
-      document.querySelector('table').scrollIntoView({behavior:'smooth', block:'start'});
     });
   });
 }
@@ -888,7 +866,7 @@ function renderScheduledCell(r){
   return openNeeded.map(d=>{
     const sch = r.scheduled[d];
     if (sch && sch.source === 'so'){
-      return `<span class="chip sched-so" title="${d}">${d}: SO${sch.soNbr} &middot; ${sch.orderDate}</span>`;
+      return `<span class="chip sched-so" title="${d}">${d}: ${sch.soNbr} &middot; ${sch.orderDate}</span>`;
     }
     if (sch && sch.source === 'manual'){
       return `<span class="chip sched-manual" title="${d}">${d}: noted ${sch.date}
@@ -937,8 +915,8 @@ function detailHtml(r){
   let soSection = '';
   if (r.openOrders && r.openOrders.length){
     const soRows = r.openOrders.map(l=>`
-      <tr>
-        <td>SO${l.soNbr}</td>
+      <tr class="${l.counts?'counts':''}">
+        <td>${l.soNbr}</td>
         <td>${l.orderDate}</td>
         <td>${l.itemClass}</td>
         <td class="sku">${(l.inventoryId||'').trim()}</td>
@@ -973,7 +951,7 @@ function detailHtml(r){
       <h4>Required updates</h4>
       ${summary || '<p style="font-size:13px;color:var(--text-muted);margin:0 0 14px">Nothing owed &mdash; every display on file is current.</p>'}
       ${soSection}
-      <h4>${r.lines.length} invoiced line item${r.lines.length===1?'':'s'} &middot; ${r.totalQty} units total</h4>
+      <h4>${r.lines.length} invoiced line item${r.lines.length===1?'':'s'}</h4>
       <table class="detail-table">
         <thead><tr><th>Date</th><th>Item Class</th><th>SKU</th><th>Description</th><th>Qty</th><th>Counts Toward</th></tr></thead>
         <tbody>${rows}</tbody>
