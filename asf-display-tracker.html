@@ -120,6 +120,15 @@
   .sales-legend .sw{ width:8px; height:8px; border-radius:50%; display:inline-block; }
   .chip.need-open{ background:var(--amber-soft); color:var(--amber); font-weight:600; }
   .chip.need-done{ background:var(--green-soft); color:var(--green); font-weight:600; text-decoration:line-through; text-decoration-color:rgba(63,107,74,0.4); }
+  .prio-tag{ display:inline-block; font-size:9.5px; font-weight:700; text-transform:uppercase; letter-spacing:0.03em; padding:1px 5px; border-radius:4px; margin-left:4px; vertical-align:middle; }
+  .prio-tag.high{ background:var(--green); color:#fff; }
+  .prio-tag.medium{ background:#C9A227; color:#fff; }
+  .prio-tag.low{ background:#B0413E; color:#fff; }
+  .badge.priority{ display:inline-flex; align-items:center; gap:5px; font-size:11.5px; font-weight:600; padding:4px 9px; border-radius:99px; }
+  .badge.priority.high{ background:var(--green-soft); color:var(--green); }
+  .badge.priority.medium{ background:#FBF0D9; color:#8A6A1E; }
+  .badge.priority.low{ background:#F6E1E0; color:#8A312E; }
+  .badge.priority.none{ background:var(--slate-soft); color:var(--slate); }
   .chip.sched-so{ background:var(--teal-soft); color:var(--teal); font-weight:600; }
   .chip.sched-manual{ background:var(--teal-soft); color:var(--teal); font-weight:600; }
   .chip.sched-none{ background:var(--paper); border:1px dashed var(--line); color:var(--text-muted); cursor:pointer; }
@@ -215,6 +224,12 @@
       <option value="scheduled">Scheduled</option>
       <option value="not_scheduled">Not scheduled</option>
     </select>
+    <select id="priorityFilter">
+      <option value="">Any priority</option>
+      <option value="high">High</option>
+      <option value="medium">Medium</option>
+      <option value="low">Low</option>
+    </select>
   </div>
 
   <p class="result-count" id="resultCount"></p>
@@ -228,6 +243,7 @@
         <th data-key="current">Current Displays</th>
         <th data-key="needed">Needed Updates</th>
         <th data-key="scheduled">Scheduled</th>
+        <th data-key="priority">Priority</th>
         <th data-key="status">Status</th>
         <th data-key="lastUpdate">Last Qualifying Update</th>
       </tr>
@@ -246,6 +262,7 @@
     <p><strong>Status override</strong> &mdash; click any status badge to manually set it, with an optional note. "Do Not Update" fully removes that dealer from the progress bars; overriding to any other status just corrects the badge shown without inventing shipment history. A &#128204; marks a person's manual override; a &#128274; marks an automatic flag (see below). Hover either to see what the automatic status would have been. Overrides are shared, same as scheduled dates.</p>
     <p><strong>Automatic "Do Not Update" flag</strong> &mdash; any customer whose name ends in <code>-COLL</code> (a credit-risk/collections account) is automatically flagged Do Not Update and excluded from the progress bars. This is a default, not a lock &mdash; click the badge to manually override it back to a tracked status if the credit issue resolves.</p>
     <p><strong>Current Display sales indicator</strong> &mdash; each chip shows a colored dot for that collection's trailing-12-month sales at this customer: green (&gt;$5,000), yellow ($0&ndash;$5,000), red ($0). The idea: if a customer isn't buying a collection at all, it may not be worth spending display budget updating them to its replacement. Hover a chip for the exact dollar figure.</p>
+    <p><strong>Priority</strong> &mdash; each open (not-yet-shipped) needed display carries a High/Medium/Low tag, derived from the same trailing-12-month sales figures on whichever current display(s) generated that requirement (summed, for the rare case where more than one current display maps to the same target). The Priority column and filter show each customer's single highest open priority.</p>
     <p><strong>Scheduled column</strong> &mdash; for each display still owed, shows an open Sales Order (SO# &amp; date) if one exists, or lets you click to note an expected date manually if no SO has been entered yet. Manual dates are shared &mdash; anyone opening this page sees the same notes, stored via the Worker. Click the pencil to edit a note or the &times; to remove it.</p>
     <p>Click any row to expand the invoice and open-order line detail. Lines highlighted green count toward a required update; the rest are other samples/marketing collateral invoiced in the same window.</p>
     <p>Business rules (which display replaces which, and which SKU counts toward which display) live in <code>asf-display-tracker-mapping.json</code> &mdash; edit that file to change the logic without touching this page.</p>
@@ -267,7 +284,7 @@ const OVERRIDABLE_STATUSES = ['needs_update','partial','updated','up_to_date','d
 
 let RECORDS = [];
 let RULES = { attributes:{}, updateMap:{}, skuMap:{} };
-let state = { search:"", status:"", rep:"", needed:"", schedule:"", sortKey:"status", sortDir:"asc", expanded:new Set() };
+let state = { search:"", status:"", rep:"", needed:"", schedule:"", priority:"", sortKey:"status", sortDir:"asc", expanded:new Set() };
 
 // ── Live-mode config ─────────────────────────────────────────────────────
 // Fill in WORKER_URL after `wrangler deploy` (see the Worker's deploy output).
@@ -386,6 +403,12 @@ function computeRecordsClient(customers, invoiceLines, openSoLines, manualSchedu
     if (amount > 0) return 'yellow';
     return 'red';
   }
+  function priorityFromAmount(amount){
+    if (amount > SALES_GREEN_THRESHOLD) return 'high';
+    if (amount > 0) return 'medium';
+    return 'low';
+  }
+  const PRIORITY_RANK = { high: 2, medium: 1, low: 0 };
 
   // For most displays, ANY SKU mapped to that display (via skuMap) counts toward fulfilling it.
   // requiredSkus lets specific displays override that — only the listed SKU(s) count, even though
@@ -418,6 +441,8 @@ function computeRecordsClient(customers, invoiceLines, openSoLines, manualSchedu
         record.fulfilledDisplays = [];
         record.scheduled = {};
         record.scheduleStatus = 'na';
+        record.openPriorityMax = null;
+        record.openPriorityCounts = { high:0, medium:0, low:0 };
       }
       return record;
     }
@@ -430,6 +455,8 @@ function computeRecordsClient(customers, invoiceLines, openSoLines, manualSchedu
       record.fulfilledDisplays = [];
       record.scheduled = {};
       record.scheduleStatus = 'na';
+      record.openPriorityMax = null;
+      record.openPriorityCounts = { high:0, medium:0, low:0 };
       record.isAutoFlagged = true;
       return record;
     }
@@ -495,11 +522,28 @@ function computeRecordsClient(customers, invoiceLines, openSoLines, manualSchedu
     const codes = displayingDealers.split(',').map(s=>s.trim()).filter(Boolean);
     const currentDisplays = [];
     const neededDisplays = new Set();
+    const neededSourceCodes = new Map(); // target display -> Set of codes that generated the requirement (for Priority attribution)
     for (const code of codes){
       const friendly = attributes[code] || code;
       const salesAmount = salesForDisplay(cid, friendly);
       currentDisplays.push({ code, name: friendly, salesAmount, salesColor: salesColor(salesAmount) });
-      for (const nd of (updateMap[code] || [])) neededDisplays.add(nd);
+      for (const nd of (updateMap[code] || [])){
+        neededDisplays.add(nd);
+        if (!neededSourceCodes.has(nd)) neededSourceCodes.set(nd, new Set());
+        neededSourceCodes.get(nd).add(code);
+      }
+    }
+
+    // Priority per needed display: sum trailing-12mo sales across every current display that
+    // generated this requirement (usually one, occasionally two — e.g. Echelon Wood Keystone can
+    // come from either Cafe or Coffee House). High/Medium/Low uses the same $5,000 threshold as
+    // the Current Display sales dots — a customer not buying the old line is low priority to update.
+    const displayPriority = {};
+    for (const target of neededDisplays){
+      const sourceCodes = neededSourceCodes.get(target) || new Set();
+      let amount = 0;
+      for (const code of sourceCodes) amount += salesForDisplay(cid, attributes[code] || code);
+      displayPriority[target] = { level: priorityFromAmount(amount), amount };
     }
 
     const rawLines = (linesByCustomer.get(cid) || []).slice().sort((a,b)=> a.InvoiceDate < b.InvoiceDate ? 1 : -1);
@@ -549,6 +593,17 @@ function computeRecordsClient(customers, invoiceLines, openSoLines, manualSchedu
     const hasSchedule = [...neededDisplays].some(d => !fulfilled.has(d) && scheduled[d]);
     const scheduleStatus = neededDisplays.size === 0 ? 'na' : (hasSchedule ? 'scheduled' : 'not_scheduled');
 
+    // Customer-level Priority rollup: the highest priority among still-open (unfulfilled) needed
+    // displays. Once a display ships, its priority no longer matters for deciding what to do next.
+    const openTargets = [...neededDisplays].filter(d => !fulfilled.has(d));
+    const openPriorityCounts = { high: 0, medium: 0, low: 0 };
+    let openPriorityMax = null;
+    for (const d of openTargets){
+      const lvl = displayPriority[d].level;
+      openPriorityCounts[lvl]++;
+      if (openPriorityMax === null || PRIORITY_RANK[lvl] > PRIORITY_RANK[openPriorityMax]) openPriorityMax = lvl;
+    }
+
     const qualifyingDates = lines.filter(l=>l.counts).map(l=>l.date);
     const lastUpdate = qualifyingDates.length ? qualifyingDates.sort().reverse()[0] : null;
     const daysSince = lastUpdate ? Math.round((Date.now() - new Date(lastUpdate+'T00:00:00Z').getTime())/86400000) : null;
@@ -558,6 +613,7 @@ function computeRecordsClient(customers, invoiceLines, openSoLines, manualSchedu
       rep: (cust.SalespersonID||'').trim() || (cust.SalesAgentID||'').trim(),
       city: cust.City || '', state: cust.State || '',
       currentDisplays, neededDisplays: [...neededDisplays].sort(), fulfilledDisplays: [...fulfilled].sort(),
+      displayPriority, openPriorityMax, openPriorityCounts,
       scheduled, scheduleStatus,
       status, lastUpdate, daysSince,
       lineCount: lines.length, totalQty: lines.reduce((s,l)=>s+(l.qty||0),0),
@@ -584,6 +640,7 @@ function computeRecordsClient(customers, invoiceLines, openSoLines, manualSchedu
       rep: (cust.SalespersonID||'').trim() || (cust.SalesAgentID||'').trim(),
       city: cust.City || '', state: cust.State || '',
       currentDisplays: [], neededDisplays: [], fulfilledDisplays: [],
+      displayPriority: {}, openPriorityMax: null, openPriorityCounts: { high:0, medium:0, low:0 },
       scheduled: {}, scheduleStatus: 'na',
       status: 'unlisted', lastUpdate: lines.length ? lines[0].date : null, daysSince: null,
       lineCount: lines.length, totalQty: lines.reduce((s,l)=>s+(l.qty||0),0),
@@ -858,6 +915,9 @@ function buildFilters(){
   const scheduleSel = document.getElementById('scheduleFilter');
   scheduleSel.addEventListener('change', ()=>{ state.schedule = scheduleSel.value; render(); });
 
+  const prioritySel = document.getElementById('priorityFilter');
+  prioritySel.addEventListener('change', ()=>{ state.priority = prioritySel.value; render(); });
+
   document.getElementById('search').addEventListener('input', (e)=>{ state.search = e.target.value.trim().toLowerCase(); render(); });
 
   document.querySelectorAll('thead th[data-key]').forEach(th=>{
@@ -910,6 +970,7 @@ function applyFilters(){
     if (state.rep && r.rep !== state.rep) return false;
     if (state.needed && !r.neededDisplays.includes(state.needed)) return false;
     if (state.schedule && r.scheduleStatus !== state.schedule) return false;
+    if (state.priority && r.openPriorityMax !== state.priority) return false;
     if (state.search){
       const hay = (r.name+' '+r.id).toLowerCase();
       if (!hay.includes(state.search)) return false;
@@ -921,6 +982,7 @@ function applyFilters(){
 function sortRecords(list){
   const dir = state.sortDir === 'asc' ? 1 : -1;
   const scheduleOrder = { not_scheduled: 0, scheduled: 1, na: 2 };
+  const priorityOrder = { low: 0, medium: 1, high: 2 };
   return [...list].sort((a,b)=>{
     let av, bv;
     switch(state.sortKey){
@@ -930,6 +992,7 @@ function sortRecords(list){
       case 'current': av=a.currentDisplays.length; bv=b.currentDisplays.length; break;
       case 'needed': av=a.neededDisplays.length; bv=b.neededDisplays.length; break;
       case 'scheduled': av=scheduleOrder[a.scheduleStatus]; bv=scheduleOrder[b.scheduleStatus]; break;
+      case 'priority': av = a.openPriorityMax!=null ? priorityOrder[a.openPriorityMax] : -1; bv = b.openPriorityMax!=null ? priorityOrder[b.openPriorityMax] : -1; break;
       case 'status': av=STATUS_META[a.status].order; bv=STATUS_META[b.status].order; break;
       case 'lastUpdate': av=a.lastUpdate||''; bv=b.lastUpdate||''; break;
       default: av=a.name; bv=b.name;
@@ -1076,13 +1139,32 @@ function renderScheduledCell(r){
   }).join('');
 }
 
+function priorityTag(level){
+  if (!level) return '';
+  return `<span class="prio-tag ${level}">${level}</span>`;
+}
+
+function priorityBadge(r){
+  if (!r.openPriorityMax) return `<span class="badge priority none">&mdash;</span>`;
+  const c = r.openPriorityCounts;
+  const parts = [];
+  if (c.high) parts.push(`${c.high} high`);
+  if (c.medium) parts.push(`${c.medium} med`);
+  if (c.low) parts.push(`${c.low} low`);
+  return `<span class="badge priority ${r.openPriorityMax}" title="${parts.join(', ')}">${r.openPriorityMax}</span>`;
+}
+
 function rowHtml(r){
   const meta = STATUS_META[r.status];
   const currentChips = r.currentDisplays.map(d=>
     `<span class="chip current" title="${d.name}: $${Math.round(d.salesAmount||0).toLocaleString()} trailing 12mo sales"><span class="sales-dot ${d.salesColor||''}"></span>${d.name}</span>`
   ).join('') || '<span class="chip current">none on file</span>';
   const neededChips = r.neededDisplays.length
-    ? r.neededDisplays.map(d=>`<span class="chip ${r.fulfilledDisplays.includes(d)?'need-done':'need-open'}">${d}</span>`).join('')
+    ? r.neededDisplays.map(d=>{
+        const done = r.fulfilledDisplays.includes(d);
+        const prio = r.displayPriority && r.displayPriority[d];
+        return `<span class="chip ${done?'need-done':'need-open'}">${d}${!done && prio ? priorityTag(prio.level) : ''}</span>`;
+      }).join('')
     : '<span class="chip current">nothing owed</span>';
   const scheduledChips = renderScheduledCell(r);
   const isExpanded = state.expanded.has(r.id);
@@ -1094,6 +1176,7 @@ function rowHtml(r){
       <td class="chip-cell">${currentChips}</td>
       <td class="chip-cell">${neededChips}</td>
       <td class="chip-cell">${scheduledChips}</td>
+      <td>${priorityBadge(r)}</td>
       <td>
         <span class="badge ${r.status}" data-cid="${r.id}" data-action="edit-status" title="${
           r.isOverridden ? `Manually set (auto: ${STATUS_META[r.autoStatus]?.label || r.autoStatus})`
@@ -1106,7 +1189,7 @@ function rowHtml(r){
       <td>${r.lastUpdate ? r.lastUpdate : '&mdash;'}${r.daysSince!=null ? ` <span class="cust-id">(${r.daysSince}d ago)</span>`:''}</td>
     </tr>
     <tr class="detail-row ${isExpanded?'':'hidden'}" data-id="${r.id}">
-      <td colspan="8">${detailHtml(r)}</td>
+      <td colspan="9">${detailHtml(r)}</td>
     </tr>
   `;
 }
@@ -1116,7 +1199,8 @@ function detailHtml(r){
   if (r.neededDisplays.length){
     summary = `<div class="need-summary">` + r.neededDisplays.map(d=>{
       const done = r.fulfilledDisplays.includes(d);
-      return `<span class="chip ${done?'need-done':'need-open'}">${done?'&#10003; ':''}${d}</span>`;
+      const prio = r.displayPriority && r.displayPriority[d];
+      return `<span class="chip ${done?'need-done':'need-open'}">${done?'&#10003; ':''}${d}${!done && prio ? priorityTag(prio.level) : ''}</span>`;
     }).join('') + `</div>`;
   }
 
