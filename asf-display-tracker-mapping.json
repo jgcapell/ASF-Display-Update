@@ -1,5 +1,5 @@
 {
-  "_readme": "Source-of-truth business rules for the ASF Display Program Tracker. attributes: DisplayingDealers code -> friendly current-display name. updateMap: same code -> list of display names the dealer needs to receive (empty = already current). skuMap: InventoryID -> which display that SKU counts toward. Edit this file and re-run/redeploy to change the rules; both the static dashboard and the live Worker read from it. requiredSkus (optional): for a display listed here, ONLY the listed SKUs count as fulfilling/scheduling that update \u2014 other SKUs mapped to the same display in skuMap still show in line detail but do not mark it complete. Omit a display from requiredSkus to keep the default behavior (any mapped SKU counts). collectionAliases (optional): maps a display name to the Collection field value(s) actually used on GC-SalesByCollectionTrailing12, for cases where the sales-tagging Collection name doesn't exactly match the display name elsewhere (e.g. both Sequoia generations are tagged simply \"Sequoia\" in that GI). Omit a display to match its own name directly.",
+  "_readme": "Source-of-truth business rules for the ASF Display Program Tracker. attributes: DisplayingDealers code -> friendly current-display name. updateMap: same code -> list of display names the dealer needs to receive (empty = already current). skuMap: InventoryID -> which display that SKU counts toward. Edit this file and re-run/redeploy to change the rules; both the static dashboard and the live Worker read from it. requiredSkus (optional): for a display listed here, ONLY the listed SKUs count as fulfilling/scheduling that update \u2014 other SKUs mapped to the same display in skuMap still show in line detail but do not mark it complete. Omit a display from requiredSkus to keep the default behavior (any mapped SKU counts). collectionAliases (optional): maps a display name to the Collection field value(s) actually used on GC-SalesByCollectionTrailing12, for cases where the sales-tagging Collection name doesn't exactly match the display name elsewhere (e.g. both Sequoia generations are tagged simply \"Sequoia\" in that GI). Omit a display to match its own name directly. displaySystemLabels: normalizes AR-Customers.DisplaySystem raw tokens (mix of short codes like 1TOWER and descriptive text like \"Single Tower\" for the same underlying fixture) to one canonical label each, so the dashboard filter/dedup treats them as identical.",
   "attributes": {
     "ACTIVEQS": "Active Quick-ship Tiles",
     "APP RES": "Appalachian Reserve",
@@ -1073,5 +1073,19 @@
     "Lifewood Sequoia 2.0 Display": [
       "Sequoia"
     ]
+  },
+  "displaySystemLabels": {
+    "1TOWER": "1 Tower",
+    "Single Tower": "1 Tower",
+    "2TOWER": "2 Tower",
+    "Double Tower": "2 Tower",
+    "3TOWER": "3 Tower",
+    "Triple Tower": "3 Tower",
+    "ASFSTACKER": "ASF Waterfall Stacker",
+    "ASF 12-Slot Waterfall Stacker": "ASF Waterfall Stacker",
+    "ECHCASTER": "Echelon Caster Display",
+    "Echelon 12-Slot Caster Displays": "Echelon Caster Display",
+    "ECHSTACKER": "Echelon Waterfall Stacker",
+    "Echelon 12-Slot Waterfall Stacker": "Echelon Waterfall Stacker"
   }
 }
