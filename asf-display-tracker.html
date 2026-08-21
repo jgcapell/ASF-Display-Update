@@ -111,6 +111,7 @@
   .chip-cell{ max-width:260px; }
   .chip{ display:inline-block; font-size:10.5px; padding:2px 7px; border-radius:5px; margin:1px 3px 1px 0; border:1px solid transparent; }
   .chip.current{ background:var(--paper); border-color:var(--line); color:var(--text-muted); position:relative; padding-left:16px; }
+  .chip.dispsys{ background:var(--paper); border-color:var(--line); color:var(--text-muted); padding-left:7px; }
   .chip.current .sales-dot{ position:absolute; left:5px; top:50%; transform:translateY(-50%); width:6px; height:6px; border-radius:50%; }
   .chip.current .sales-dot.green{ background:var(--green); }
   .chip.current .sales-dot.yellow{ background:#C9A227; }
@@ -218,17 +219,18 @@
     <input id="search" type="text" placeholder="Search customer name or ID&hellip;">
     <div class="pillbar" id="statusPills"></div>
     <select id="repFilter"><option value="">All reps</option></select>
-    <select id="neededFilter"><option value="">Needs any display</option></select>
+    <select id="neededFilter"><option value="">Needed collection: any</option></select>
+    <select id="priorityFilter">
+      <option value="">Priority: any</option>
+      <option value="high">High</option>
+      <option value="medium">Medium</option>
+      <option value="low">Low</option>
+    </select>
+    <select id="displaySystemFilter"><option value="">Display system: any</option></select>
     <select id="scheduleFilter">
       <option value="">Any scheduling</option>
       <option value="scheduled">Scheduled</option>
       <option value="not_scheduled">Not scheduled</option>
-    </select>
-    <select id="priorityFilter">
-      <option value="">Any priority</option>
-      <option value="high">High</option>
-      <option value="medium">Medium</option>
-      <option value="low">Low</option>
     </select>
   </div>
 
@@ -242,8 +244,8 @@
         <th data-key="loc">Location</th>
         <th data-key="current">Current Displays</th>
         <th data-key="needed">Needed Updates</th>
+        <th data-key="displaySystem">Display System</th>
         <th data-key="scheduled">Scheduled</th>
-        <th data-key="priority">Priority</th>
         <th data-key="status">Status</th>
         <th data-key="lastUpdate">Last Qualifying Update</th>
       </tr>
@@ -262,7 +264,8 @@
     <p><strong>Status override</strong> &mdash; click any status badge to manually set it, with an optional note. "Do Not Update" fully removes that dealer from the progress bars; overriding to any other status just corrects the badge shown without inventing shipment history. A &#128204; marks a person's manual override; a &#128274; marks an automatic flag (see below). Hover either to see what the automatic status would have been. Overrides are shared, same as scheduled dates.</p>
     <p><strong>Automatic "Do Not Update" flag</strong> &mdash; any customer whose name ends in <code>-COLL</code> (a credit-risk/collections account) is automatically flagged Do Not Update and excluded from the progress bars. This is a default, not a lock &mdash; click the badge to manually override it back to a tracked status if the credit issue resolves.</p>
     <p><strong>Current Display sales indicator</strong> &mdash; each chip shows a colored dot for that collection's trailing-12-month sales at this customer: green (&gt;$5,000), yellow ($0&ndash;$5,000), red ($0). The idea: if a customer isn't buying a collection at all, it may not be worth spending display budget updating them to its replacement. Hover a chip for the exact dollar figure.</p>
-    <p><strong>Priority</strong> &mdash; each open (not-yet-shipped) needed display carries a High/Medium/Low tag, derived from the same trailing-12-month sales figures on whichever current display(s) generated that requirement (summed, for the rare case where more than one current display maps to the same target). The Priority column and filter show each customer's single highest open priority.</p>
+    <p><strong>Priority</strong> &mdash; each open (not-yet-shipped) needed display carries a High/Medium/Low tag on its chip in the Needed Updates column, derived from the same trailing-12-month sales figures on whichever current display(s) generated that requirement (summed, for the rare case where more than one current display maps to the same target). The "Needed collection" and "Priority" filters combine against that same open item &mdash; picking both shows only customers whose specific matching item satisfies both, e.g. "Gulf Coast HD WPC" that is specifically "High."</p>
+    <p><strong>Display System</strong> &mdash; pulled directly from the customer record, filterable, no logic applied on top. Handled internally (e.g. Tower-display customers getting first priority).</p>
     <p><strong>Scheduled column</strong> &mdash; for each display still owed, shows an open Sales Order (SO# &amp; date) if one exists, or lets you click to note an expected date manually if no SO has been entered yet. Manual dates are shared &mdash; anyone opening this page sees the same notes, stored via the Worker. Click the pencil to edit a note or the &times; to remove it.</p>
     <p>Click any row to expand the invoice and open-order line detail. Lines highlighted green count toward a required update; the rest are other samples/marketing collateral invoiced in the same window.</p>
     <p>Business rules (which display replaces which, and which SKU counts toward which display) live in <code>asf-display-tracker-mapping.json</code> &mdash; edit that file to change the logic without touching this page.</p>
@@ -284,7 +287,7 @@ const OVERRIDABLE_STATUSES = ['needs_update','partial','updated','up_to_date','d
 
 let RECORDS = [];
 let RULES = { attributes:{}, updateMap:{}, skuMap:{} };
-let state = { search:"", status:"", rep:"", needed:"", schedule:"", priority:"", sortKey:"status", sortDir:"asc", expanded:new Set() };
+let state = { search:"", status:"", rep:"", needed:"", schedule:"", priority:"", displaySystem:"", sortKey:"status", sortDir:"asc", expanded:new Set() };
 
 // ── Live-mode config ─────────────────────────────────────────────────────
 // Fill in WORKER_URL after `wrangler deploy` (see the Worker's deploy output).
@@ -614,6 +617,7 @@ function computeRecordsClient(customers, invoiceLines, openSoLines, manualSchedu
       city: cust.City || '', state: cust.State || '',
       currentDisplays, neededDisplays: [...neededDisplays].sort(), fulfilledDisplays: [...fulfilled].sort(),
       displayPriority, openPriorityMax, openPriorityCounts,
+      displaySystems: (cust.DisplaySystem||'').split(',').map(s=>s.trim()).filter(Boolean),
       scheduled, scheduleStatus,
       status, lastUpdate, daysSince,
       lineCount: lines.length, totalQty: lines.reduce((s,l)=>s+(l.qty||0),0),
@@ -641,6 +645,7 @@ function computeRecordsClient(customers, invoiceLines, openSoLines, manualSchedu
       city: cust.City || '', state: cust.State || '',
       currentDisplays: [], neededDisplays: [], fulfilledDisplays: [],
       displayPriority: {}, openPriorityMax: null, openPriorityCounts: { high:0, medium:0, low:0 },
+      displaySystems: (cust.DisplaySystem||'').split(',').map(s=>s.trim()).filter(Boolean),
       scheduled: {}, scheduleStatus: 'na',
       status: 'unlisted', lastUpdate: lines.length ? lines[0].date : null, daysSince: null,
       lineCount: lines.length, totalQty: lines.reduce((s,l)=>s+(l.qty||0),0),
@@ -763,7 +768,7 @@ async function loadLiveData(){
     const since = DEFAULT_SINCE;
     const [customers, invoiceLines, openSoLines, manualSchedule, statusOverrides, collectionSalesLines] = await Promise.all([
       odataFetchAll('AR-Customers', "CustomerStatus eq 'Active'",
-        'CustomerID,CustomerName,CustomerStatus,SalespersonID,SalesAgentID,DisplayingDealers,City,State', token),
+        'CustomerID,CustomerName,CustomerStatus,SalespersonID,SalesAgentID,DisplayingDealers,DisplaySystem,City,State', token),
       odataFetchAll('InvoicedItems', buildItemClassFilter(since),
         'CustomerID,InvoiceDate,ItemClass,InventoryID,Description,Quantity', token),
       odataFetchAll(OPEN_SO_RESOURCE, buildOpenSoItemClassFilter(), OPEN_SO_SELECT, token)
@@ -915,6 +920,11 @@ function buildFilters(){
   const scheduleSel = document.getElementById('scheduleFilter');
   scheduleSel.addEventListener('change', ()=>{ state.schedule = scheduleSel.value; render(); });
 
+  const dsValues = [...new Set(RECORDS.flatMap(r=>r.displaySystems||[]))].sort();
+  const dsSel = document.getElementById('displaySystemFilter');
+  dsValues.forEach(v=>{ const o=document.createElement('option'); o.value=v; o.textContent=v; dsSel.appendChild(o); });
+  dsSel.addEventListener('change', ()=>{ state.displaySystem = dsSel.value; render(); });
+
   const prioritySel = document.getElementById('priorityFilter');
   prioritySel.addEventListener('change', ()=>{ state.priority = prioritySel.value; render(); });
 
@@ -968,9 +978,23 @@ function applyFilters(){
   return RECORDS.filter(r=>{
     if (state.status && r.status !== state.status) return false;
     if (state.rep && r.rep !== state.rep) return false;
-    if (state.needed && !r.neededDisplays.includes(state.needed)) return false;
     if (state.schedule && r.scheduleStatus !== state.schedule) return false;
-    if (state.priority && r.openPriorityMax !== state.priority) return false;
+    if (state.displaySystem && !(r.displaySystems||[]).includes(state.displaySystem)) return false;
+    // Collection + Priority combine against the customer's still-open needed displays: with both
+    // set, a customer only matches if the SAME open item satisfies both (e.g. "Gulf Coast HD WPC"
+    // that is specifically "high" priority) — not just any open item matching either independently.
+    if (state.needed || state.priority){
+      const openNeeded = r.neededDisplays.filter(d => !r.fulfilledDisplays.includes(d));
+      const matches = openNeeded.some(d=>{
+        if (state.needed && d !== state.needed) return false;
+        if (state.priority){
+          const prio = r.displayPriority && r.displayPriority[d];
+          if (!prio || prio.level !== state.priority) return false;
+        }
+        return true;
+      });
+      if (!matches) return false;
+    }
     if (state.search){
       const hay = (r.name+' '+r.id).toLowerCase();
       if (!hay.includes(state.search)) return false;
@@ -992,7 +1016,7 @@ function sortRecords(list){
       case 'current': av=a.currentDisplays.length; bv=b.currentDisplays.length; break;
       case 'needed': av=a.neededDisplays.length; bv=b.neededDisplays.length; break;
       case 'scheduled': av=scheduleOrder[a.scheduleStatus]; bv=scheduleOrder[b.scheduleStatus]; break;
-      case 'priority': av = a.openPriorityMax!=null ? priorityOrder[a.openPriorityMax] : -1; bv = b.openPriorityMax!=null ? priorityOrder[b.openPriorityMax] : -1; break;
+      case 'displaySystem': av=(a.displaySystems||[]).join(','); bv=(b.displaySystems||[]).join(','); break;
       case 'status': av=STATUS_META[a.status].order; bv=STATUS_META[b.status].order; break;
       case 'lastUpdate': av=a.lastUpdate||''; bv=b.lastUpdate||''; break;
       default: av=a.name; bv=b.name;
@@ -1144,16 +1168,6 @@ function priorityTag(level){
   return `<span class="prio-tag ${level}">${level}</span>`;
 }
 
-function priorityBadge(r){
-  if (!r.openPriorityMax) return `<span class="badge priority none">&mdash;</span>`;
-  const c = r.openPriorityCounts;
-  const parts = [];
-  if (c.high) parts.push(`${c.high} high`);
-  if (c.medium) parts.push(`${c.medium} med`);
-  if (c.low) parts.push(`${c.low} low`);
-  return `<span class="badge priority ${r.openPriorityMax}" title="${parts.join(', ')}">${r.openPriorityMax}</span>`;
-}
-
 function rowHtml(r){
   const meta = STATUS_META[r.status];
   const currentChips = r.currentDisplays.map(d=>
@@ -1167,6 +1181,9 @@ function rowHtml(r){
       }).join('')
     : '<span class="chip current">nothing owed</span>';
   const scheduledChips = renderScheduledCell(r);
+  const displaySystemChips = (r.displaySystems && r.displaySystems.length)
+    ? r.displaySystems.map(v=>`<span class="chip dispsys">${v}</span>`).join('')
+    : '<span class="chip current">none on file</span>';
   const isExpanded = state.expanded.has(r.id);
   return `
     <tr class="row ${isExpanded?'expanded':''}" data-id="${r.id}">
@@ -1175,8 +1192,8 @@ function rowHtml(r){
       <td>${r.city}${r.city&&r.state?', ':''}${r.state}</td>
       <td class="chip-cell">${currentChips}</td>
       <td class="chip-cell">${neededChips}</td>
+      <td class="chip-cell">${displaySystemChips}</td>
       <td class="chip-cell">${scheduledChips}</td>
-      <td>${priorityBadge(r)}</td>
       <td>
         <span class="badge ${r.status}" data-cid="${r.id}" data-action="edit-status" title="${
           r.isOverridden ? `Manually set (auto: ${STATUS_META[r.autoStatus]?.label || r.autoStatus})`
