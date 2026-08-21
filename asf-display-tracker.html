@@ -21,6 +21,7 @@
     --teal:#3E7C86;    --teal-soft:#DEEBED;
     --plum:#7A4B54;    --plum-soft:#F0E2E3;
     --slate:#7C8592;   --slate-soft:#E9EAEC;
+    --mute:#4B5157;    --mute-soft:#E4E4E5;
     --radius:10px;
     --shadow: 0 1px 2px rgba(22,33,58,0.06), 0 4px 16px rgba(22,33,58,0.05);
   }
@@ -96,10 +97,27 @@
   .badge.needs_update{ background:var(--amber-soft); color:var(--amber); }
   .badge.unlisted{ background:var(--plum-soft); color:var(--plum); }
   .badge.up_to_date{ background:var(--slate-soft); color:var(--slate); }
+  .badge.do_not_update{ background:var(--mute-soft); color:var(--mute); }
+  .badge{ cursor:pointer; }
+  .badge .override-pin{ margin-left:2px; opacity:0.7; }
+  .status-editor{ display:inline-flex; align-items:center; gap:5px; background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:5px 7px; }
+  .status-editor select{ font:inherit; font-size:11.5px; padding:2px 4px; border-radius:5px; }
+  .status-editor input[type="text"]{ font:inherit; font-size:11.5px; border:1px solid var(--line); border-radius:5px; padding:2px 5px; width:110px; }
+  .status-editor button{ border:none; background:transparent; cursor:pointer; font-size:13px; padding:2px 4px; border-radius:4px; }
+  .status-editor .st-save{ color:var(--green); }
+  .status-editor .st-clear{ color:var(--text-muted); }
+  .status-editor button:hover{ background:var(--paper); }
   .dot{ width:6px; height:6px; border-radius:50%; background:currentColor; display:inline-block; }
   .chip-cell{ max-width:260px; }
   .chip{ display:inline-block; font-size:10.5px; padding:2px 7px; border-radius:5px; margin:1px 3px 1px 0; border:1px solid transparent; }
-  .chip.current{ background:var(--paper); border-color:var(--line); color:var(--text-muted); }
+  .chip.current{ background:var(--paper); border-color:var(--line); color:var(--text-muted); position:relative; padding-left:16px; }
+  .chip.current .sales-dot{ position:absolute; left:5px; top:50%; transform:translateY(-50%); width:6px; height:6px; border-radius:50%; }
+  .chip.current .sales-dot.green{ background:var(--green); }
+  .chip.current .sales-dot.yellow{ background:#C9A227; }
+  .chip.current .sales-dot.red{ background:#B0413E; }
+  .sales-legend{ display:flex; gap:16px; margin-top:10px; font-size:11.5px; color:var(--text-muted); }
+  .sales-legend span{ display:inline-flex; align-items:center; gap:5px; }
+  .sales-legend .sw{ width:8px; height:8px; border-radius:50%; display:inline-block; }
   .chip.need-open{ background:var(--amber-soft); color:var(--amber); font-weight:600; }
   .chip.need-done{ background:var(--green-soft); color:var(--green); font-weight:600; text-decoration:line-through; text-decoration-color:rgba(63,107,74,0.4); }
   .chip.sched-so{ background:var(--teal-soft); color:var(--teal); font-weight:600; }
@@ -175,6 +193,11 @@
   <section class="legend">
     <p class="legend-head">Required display transitions</p>
     <div class="transitions" id="transitions"><!-- filled by JS --></div>
+    <div class="sales-legend">
+      <span><span class="sw" style="background:var(--green)"></span>Current display: &gt;$5,000 trailing 12mo sales</span>
+      <span><span class="sw" style="background:#C9A227"></span>$0&ndash;$5,000</span>
+      <span><span class="sw" style="background:#B0413E"></span>$0 sales &mdash; may not be worth updating</span>
+    </div>
   </section>
 
   <section class="progress-panel">
@@ -218,7 +241,11 @@
     <em>Partial</em>: some but not all required replacement displays have shipped.
     <em>Updated</em>: every required replacement display has shipped since 5/1/2026.
     <em>Up to Date</em>: every display this dealer currently has is already the current generation &mdash; nothing owed.
-    <em>Unlisted</em>: invoiced for these item classes but AR-Customers shows no display program on file.</p>
+    <em>Unlisted</em>: invoiced for these item classes but AR-Customers shows no display program on file.
+    <em>Do Not Update</em>: manually excluded from tracking (e.g. inactive or non-paying accounts) &mdash; not counted in the progress bars.</p>
+    <p><strong>Status override</strong> &mdash; click any status badge to manually set it, with an optional note. "Do Not Update" fully removes that dealer from the progress bars; overriding to any other status just corrects the badge shown without inventing shipment history. A &#128204; marks a person's manual override; a &#128274; marks an automatic flag (see below). Hover either to see what the automatic status would have been. Overrides are shared, same as scheduled dates.</p>
+    <p><strong>Automatic "Do Not Update" flag</strong> &mdash; any customer whose name ends in <code>-COLL</code> (a credit-risk/collections account) is automatically flagged Do Not Update and excluded from the progress bars. This is a default, not a lock &mdash; click the badge to manually override it back to a tracked status if the credit issue resolves.</p>
+    <p><strong>Current Display sales indicator</strong> &mdash; each chip shows a colored dot for that collection's trailing-12-month sales at this customer: green (&gt;$5,000), yellow ($0&ndash;$5,000), red ($0). The idea: if a customer isn't buying a collection at all, it may not be worth spending display budget updating them to its replacement. Hover a chip for the exact dollar figure.</p>
     <p><strong>Scheduled column</strong> &mdash; for each display still owed, shows an open Sales Order (SO# &amp; date) if one exists, or lets you click to note an expected date manually if no SO has been entered yet. Manual dates are shared &mdash; anyone opening this page sees the same notes, stored via the Worker. Click the pencil to edit a note or the &times; to remove it.</p>
     <p>Click any row to expand the invoice and open-order line detail. Lines highlighted green count toward a required update; the rest are other samples/marketing collateral invoiced in the same window.</p>
     <p>Business rules (which display replaces which, and which SKU counts toward which display) live in <code>asf-display-tracker-mapping.json</code> &mdash; edit that file to change the logic without touching this page.</p>
@@ -233,8 +260,10 @@ const STATUS_META = {
   partial:      { label: "Partial",      order: 1 },
   needs_update: { label: "Needs Update", order: 0 },
   up_to_date:   { label: "Up to Date",   order: 3 },
-  unlisted:     { label: "Unlisted",     order: 4 }
+  unlisted:     { label: "Unlisted",     order: 4 },
+  do_not_update:{ label: "Do Not Update",order: 5 }
 };
+const OVERRIDABLE_STATUSES = ['needs_update','partial','updated','up_to_date','do_not_update'];
 
 let RECORDS = [];
 let RULES = { attributes:{}, updateMap:{}, skuMap:{} };
@@ -289,6 +318,14 @@ const OPEN_SO_FIELDS = {
 };
 const OPEN_SO_SELECT = Object.values(OPEN_SO_FIELDS).join(',');
 
+// ── Trailing-12-month sales by collection (from "GC-SalesByCollectionTrailing12") ──
+// Confirmed via CData against live data on 8/21/2026: 1,294 rows, 645 customers, rolling
+// 365-day window already baked into the GI's own date condition — no filter needed here.
+const SALES_BY_COLLECTION_RESOURCE = "GC-SalesByCollectionTrailing12";
+const SALES_FIELDS = { customerId: "CustomerID", collection: "Collection", amount: "ExtAmount" };
+const SALES_SELECT = Object.values(SALES_FIELDS).join(',');
+const SALES_GREEN_THRESHOLD = 5000;
+
 function buildOpenSoItemClassFilter(){
   // Same fixed-width ClassID strings as ItemClass on InvoicedItems — confirmed identical format.
   return ITEM_CLASSES.map(ic => `${OPEN_SO_FIELDS.itemClass} eq '${ic.replace(/'/g,"''")}'`).join(' or ');
@@ -300,7 +337,7 @@ async function odataFetchAll(resource, filter, select, token){
   const rows = [];
   while (true){
     const params = new URLSearchParams();
-    params.set('$filter', filter);
+    if (filter) params.set('$filter', filter);
     if (select) params.set('$select', select);
     params.set('$top', String(pageSize));
     params.set('$skip', String(skip));
@@ -319,10 +356,36 @@ async function odataFetchAll(resource, filter, select, token){
   return rows;
 }
 
-function computeRecordsClient(customers, invoiceLines, openSoLines, manualSchedule){
-  const { attributes, updateMap, skuMap, requiredSkus } = RULES;
+function computeRecordsClient(customers, invoiceLines, openSoLines, manualSchedule, statusOverrides, collectionSalesLines){
+  const { attributes, updateMap, skuMap, requiredSkus, collectionAliases } = RULES;
   openSoLines = openSoLines || [];
   manualSchedule = manualSchedule || {};
+  statusOverrides = statusOverrides || {};
+  collectionSalesLines = collectionSalesLines || [];
+
+  // Trailing-12-month sales, summed per customer + collection (rolling window already baked
+  // into the GI itself). Used to color-code each "Current Display" chip: is this customer
+  // actually buying the collection they're currently displaying?
+  const salesByCustomer = new Map(); // customerId -> Map<collectionName, totalAmount>
+  for (const line of collectionSalesLines){
+    const cid = (line[SALES_FIELDS.customerId] || '').trim();
+    const collection = (line[SALES_FIELDS.collection] || '').trim();
+    if (!cid || !collection) continue;
+    if (!salesByCustomer.has(cid)) salesByCustomer.set(cid, new Map());
+    const m = salesByCustomer.get(cid);
+    m.set(collection, (m.get(collection) || 0) + (line[SALES_FIELDS.amount] || 0));
+  }
+  function salesForDisplay(cid, displayName){
+    const keys = (collectionAliases && collectionAliases[displayName]) || [displayName];
+    const m = salesByCustomer.get(cid);
+    if (!m) return 0;
+    return keys.reduce((sum, k) => sum + (m.get(k) || 0), 0);
+  }
+  function salesColor(amount){
+    if (amount > SALES_GREEN_THRESHOLD) return 'green';
+    if (amount > 0) return 'yellow';
+    return 'red';
+  }
 
   // For most displays, ANY SKU mapped to that display (via skuMap) counts toward fulfilling it.
   // requiredSkus lets specific displays override that — only the listed SKU(s) count, even though
@@ -331,6 +394,47 @@ function computeRecordsClient(customers, invoiceLines, openSoLines, manualSchedu
     if (!display) return false;
     const whitelist = requiredSkus && requiredSkus[display];
     return whitelist ? whitelist.includes(invId) : true;
+  }
+
+  // Applies a manual override on top of the computed status/tracking fields for one record, in place.
+  // "Do Not Update" fully opts the customer out of tracking (empty needed/fulfilled/scheduled, so the
+  // progress bars ignore them entirely). Overriding to any other status just corrects the badge shown —
+  // it does not fabricate per-display shipment data that didn't actually happen.
+  function applyOverride(record){
+    const autoStatus = record.status; // naturally-computed baseline, before any flag or override
+    record.autoStatus = autoStatus;
+
+    const isCollFlagged = /-COLL\s*$/i.test((record.name || '').trim());
+    record.collFlagged = isCollFlagged;
+
+    const override = statusOverrides[record.id];
+    if (override && override.status){
+      // A person's explicit decision always wins — including reversing an auto "-COLL" flag.
+      record.status = override.status;
+      record.overrideNote = override.note || '';
+      record.isOverridden = true;
+      if (override.status === 'do_not_update'){
+        record.neededDisplays = [];
+        record.fulfilledDisplays = [];
+        record.scheduled = {};
+        record.scheduleStatus = 'na';
+      }
+      return record;
+    }
+
+    if (isCollFlagged){
+      // "-COLL" suffix = credit risk / collections account. Auto-flagged, not a person's decision —
+      // shown with a different marker than a manual override, and still reversible via the same control.
+      record.status = 'do_not_update';
+      record.neededDisplays = [];
+      record.fulfilledDisplays = [];
+      record.scheduled = {};
+      record.scheduleStatus = 'na';
+      record.isAutoFlagged = true;
+      return record;
+    }
+
+    return record; // status stays as naturally computed
   }
 
   const linesByCustomer = new Map();
@@ -393,7 +497,8 @@ function computeRecordsClient(customers, invoiceLines, openSoLines, manualSchedu
     const neededDisplays = new Set();
     for (const code of codes){
       const friendly = attributes[code] || code;
-      currentDisplays.push({ code, name: friendly });
+      const salesAmount = salesForDisplay(cid, friendly);
+      currentDisplays.push({ code, name: friendly, salesAmount, salesColor: salesColor(salesAmount) });
       for (const nd of (updateMap[code] || [])) neededDisplays.add(nd);
     }
 
@@ -448,7 +553,7 @@ function computeRecordsClient(customers, invoiceLines, openSoLines, manualSchedu
     const lastUpdate = qualifyingDates.length ? qualifyingDates.sort().reverse()[0] : null;
     const daysSince = lastUpdate ? Math.round((Date.now() - new Date(lastUpdate+'T00:00:00Z').getTime())/86400000) : null;
 
-    records.push({
+    records.push(applyOverride({
       id: cid, name: cust.CustomerName,
       rep: (cust.SalespersonID||'').trim() || (cust.SalesAgentID||'').trim(),
       city: cust.City || '', state: cust.State || '',
@@ -457,7 +562,7 @@ function computeRecordsClient(customers, invoiceLines, openSoLines, manualSchedu
       status, lastUpdate, daysSince,
       lineCount: lines.length, totalQty: lines.reduce((s,l)=>s+(l.qty||0),0),
       lines, openOrders
-    });
+    }));
   }
 
   const custById = new Map(customers.map(c=>[(c.CustomerID||'').trim(), c]));
@@ -474,7 +579,7 @@ function computeRecordsClient(customers, invoiceLines, openSoLines, manualSchedu
         display: skuEntry ? skuEntry.display : null, counts: false
       };
     });
-    records.push({
+    records.push(applyOverride({
       id: cid, name: cust.CustomerName,
       rep: (cust.SalespersonID||'').trim() || (cust.SalesAgentID||'').trim(),
       city: cust.City || '', state: cust.State || '',
@@ -483,7 +588,7 @@ function computeRecordsClient(customers, invoiceLines, openSoLines, manualSchedu
       status: 'unlisted', lastUpdate: lines.length ? lines[0].date : null, daysSince: null,
       lineCount: lines.length, totalQty: lines.reduce((s,l)=>s+(l.qty||0),0),
       lines, openOrders: []
-    });
+    }));
   }
 
   return { records, staleManualKeys };
@@ -557,6 +662,41 @@ async function cleanupStaleManualEntries(staleKeys){
   }
 }
 
+// ── Manual status overrides (e.g. "Do Not Update" for inactive/non-paying accounts) ──
+// Same KV namespace as the schedule notes, different key — shared across everyone viewing the dashboard.
+async function fetchStatusOverrides(token){
+  try {
+    const res = await fetch(`${LIVE.workerUrl}/status-override`, { headers: { Authorization: `Bearer ${token}` } });
+    if (!res.ok) return {};
+    return await res.json();
+  } catch (e) {
+    console.warn('Could not load status overrides:', e);
+    return {};
+  }
+}
+
+async function saveStatusOverride(customerId, status, note){
+  const token = CURRENT_TOKEN;
+  const res = await fetch(`${LIVE.workerUrl}/status-override`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ customerId, status, note: note || '' }),
+  });
+  if (!res.ok) throw new Error('Save failed: ' + (await res.text()));
+  return res.json();
+}
+
+async function clearStatusOverride(customerId){
+  const token = CURRENT_TOKEN;
+  const res = await fetch(`${LIVE.workerUrl}/status-override`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ customerId }),
+  });
+  if (!res.ok) throw new Error('Clear failed: ' + (await res.text()));
+  return res.json();
+}
+
 async function loadLiveData(){
   const token = sessionStorage.getItem('access_token');
   if (!token) return false;
@@ -564,7 +704,7 @@ async function loadLiveData(){
   setLiveState('loading', 'Loading live data…');
   try {
     const since = DEFAULT_SINCE;
-    const [customers, invoiceLines, openSoLines, manualSchedule] = await Promise.all([
+    const [customers, invoiceLines, openSoLines, manualSchedule, statusOverrides, collectionSalesLines] = await Promise.all([
       odataFetchAll('AR-Customers', "CustomerStatus eq 'Active'",
         'CustomerID,CustomerName,CustomerStatus,SalespersonID,SalesAgentID,DisplayingDealers,City,State', token),
       odataFetchAll('InvoicedItems', buildItemClassFilter(since),
@@ -572,8 +712,11 @@ async function loadLiveData(){
       odataFetchAll(OPEN_SO_RESOURCE, buildOpenSoItemClassFilter(), OPEN_SO_SELECT, token)
         .catch(e => { console.warn('Open SO fetch failed — Scheduled column will only show manual entries:', e); return []; }),
       fetchManualSchedule(token),
+      fetchStatusOverrides(token),
+      odataFetchAll(SALES_BY_COLLECTION_RESOURCE, null, SALES_SELECT, token)
+        .catch(e => { console.warn('Collection sales fetch failed — current-display sales indicators will be unavailable:', e); return []; }),
     ]);
-    const computed = computeRecordsClient(customers, invoiceLines, openSoLines, manualSchedule);
+    const computed = computeRecordsClient(customers, invoiceLines, openSoLines, manualSchedule, statusOverrides, collectionSalesLines);
     RECORDS = computed.records;
     cleanupStaleManualEntries(computed.staleManualKeys); // fire-and-forget; don't block the render on it
     document.getElementById('sinceLabel').textContent = since.slice(0,10);
@@ -688,7 +831,7 @@ function renderTransitionLegend(){
 
 function buildFilters(){
   const pillbar = document.getElementById('statusPills');
-  const order = ['needs_update','partial','updated','up_to_date','unlisted'];
+  const order = ['needs_update','partial','updated','up_to_date','unlisted','do_not_update'];
   const pills = [{key:"", label:`All (${RECORDS.length})`}].concat(
     order.map(k => ({key:k, label:`${STATUS_META[k].label} (${RECORDS.filter(r=>r.status===k).length})`}))
   );
@@ -826,7 +969,8 @@ function render(){
     el.addEventListener('click', (e)=>{
       e.stopPropagation();
       const { cid, display, action } = el.dataset;
-      if (action === 'clear') handleClearSchedule(cid, display, el);
+      if (action === 'edit-status') openStatusEditor(el, cid);
+      else if (action === 'clear') handleClearSchedule(cid, display, el);
       else openScheduleEditor(el, cid, display);
     });
   });
@@ -867,10 +1011,44 @@ function openScheduleEditor(el, cid, display){
   editor.querySelector('.sched-cancel').addEventListener('click', (e)=>{ e.stopPropagation(); render(); });
 }
 
+function openStatusEditor(el, cid){
+  const record = findRecord(cid);
+  if (!record) return;
+  const options = OVERRIDABLE_STATUSES.map(s=>
+    `<option value="${s}" ${record.isOverridden && record.status===s ? 'selected':''}>${STATUS_META[s].label}</option>`
+  ).join('');
+  el.outerHTML = `
+    <span class="status-editor" data-cid="${cid}">
+      <select class="status-select">
+        <option value="">Auto (computed)</option>
+        ${options}
+      </select>
+      <input type="text" class="status-note-input" placeholder="Note (optional)" value="${record.overrideNote || ''}">
+      <button class="st-save" title="Save">&#10003;</button>
+      <button class="st-cancel" title="Cancel">&times;</button>
+    </span>`;
+  const editor = [...document.querySelectorAll('.status-editor')].find(e=>e.dataset.cid===cid);
+  if (!editor) return;
+  editor.querySelector('.st-save').addEventListener('click', async (e)=>{
+    e.stopPropagation();
+    const status = editor.querySelector('.status-select').value;
+    const note = editor.querySelector('.status-note-input').value;
+    try {
+      if (!status){
+        await clearStatusOverride(cid);
+      } else {
+        await saveStatusOverride(cid, status, note);
+      }
+      await loadLiveData(); // full recompute — an override can change progress-bar denominators
+      render();
+    } catch (err) { alert('Could not save: ' + err.message); }
+  });
+  editor.querySelector('.st-cancel').addEventListener('click', (e)=>{ e.stopPropagation(); render(); });
+}
+
 async function handleClearSchedule(cid, display, el){
   if (!confirm(`Remove the manually-noted date for ${display}?`)) return;
-  try {
-    await deleteScheduleEntry(cid, display);
+  try {    await deleteScheduleEntry(cid, display);
     const rec = findRecord(cid);
     delete rec.scheduled[display];
     recomputeScheduleStatus(rec);
@@ -900,7 +1078,9 @@ function renderScheduledCell(r){
 
 function rowHtml(r){
   const meta = STATUS_META[r.status];
-  const currentChips = r.currentDisplays.map(d=>`<span class="chip current">${d.name}</span>`).join('') || '<span class="chip current">none on file</span>';
+  const currentChips = r.currentDisplays.map(d=>
+    `<span class="chip current" title="${d.name}: $${Math.round(d.salesAmount||0).toLocaleString()} trailing 12mo sales"><span class="sales-dot ${d.salesColor||''}"></span>${d.name}</span>`
+  ).join('') || '<span class="chip current">none on file</span>';
   const neededChips = r.neededDisplays.length
     ? r.neededDisplays.map(d=>`<span class="chip ${r.fulfilledDisplays.includes(d)?'need-done':'need-open'}">${d}</span>`).join('')
     : '<span class="chip current">nothing owed</span>';
@@ -914,7 +1094,15 @@ function rowHtml(r){
       <td class="chip-cell">${currentChips}</td>
       <td class="chip-cell">${neededChips}</td>
       <td class="chip-cell">${scheduledChips}</td>
-      <td><span class="badge ${r.status}"><span class="dot"></span>${meta.label}</span></td>
+      <td>
+        <span class="badge ${r.status}" data-cid="${r.id}" data-action="edit-status" title="${
+          r.isOverridden ? `Manually set (auto: ${STATUS_META[r.autoStatus]?.label || r.autoStatus})`
+          : r.isAutoFlagged ? `Auto-flagged: "-COLL" account (auto: ${STATUS_META[r.autoStatus]?.label || r.autoStatus}) — click to override`
+          : 'Click to override'
+        }">
+          <span class="dot"></span>${meta.label}${r.isOverridden ? ' <span class="override-pin">&#128204;</span>' : ''}${r.isAutoFlagged && !r.isOverridden ? ' <span class="override-pin">&#128274;</span>' : ''}
+        </span>
+      </td>
       <td>${r.lastUpdate ? r.lastUpdate : '&mdash;'}${r.daysSince!=null ? ` <span class="cust-id">(${r.daysSince}d ago)</span>`:''}</td>
     </tr>
     <tr class="detail-row ${isExpanded?'':'hidden'}" data-id="${r.id}">
